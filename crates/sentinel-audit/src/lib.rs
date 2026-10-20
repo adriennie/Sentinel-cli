@@ -306,8 +306,13 @@ impl Store {
             }
         }
         file.write_all(&bytes)
-            .and_then(|_| file.sync_data())
-            .map_err(|_| AuditError("Unable to append audit events"))
+            .map_err(|_| AuditError("Unable to append audit events"))?;
+        // The batch is now whole. Do not hold the append lock across slow disk
+        // flushes: concurrent writers must not starve behind another fsync.
+        file.unlock()
+            .map_err(|_| AuditError("Unable to release audit append lock"))?;
+        file.sync_data()
+            .map_err(|_| AuditError("Unable to sync audit events"))
     }
     pub fn read(&self, limit: usize, filter: Option<EventType>) -> Result<History, AuditError> {
         if !(1..=10_000).contains(&limit) {
@@ -329,6 +334,8 @@ impl Store {
             .take(MAX_LOG_BYTES + 1)
             .read_to_end(&mut bytes)
             .map_err(|_| AuditError("Unable to read audit log"))?;
+        file.unlock()
+            .map_err(|_| AuditError("Unable to release audit read lock"))?;
         if bytes.len() as u64 > MAX_LOG_BYTES {
             return Err(AuditError("Audit log exceeds read limit"));
         }

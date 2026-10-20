@@ -69,6 +69,9 @@ fn encoding_and_size_gaps_are_not_reported_as_clean() {
     let root = tempdir().unwrap();
     fs::write(root.path().join("binary"), [0, 1, 2]).unwrap();
     assert!(scan_secrets(root.path(), false).complete);
+    fs::write(root.path().join("large-binary"), vec![0; 2 * 1024 * 1024]).unwrap();
+    assert!(scan_secrets(root.path(), false).complete);
+    fs::remove_file(root.path().join("large-binary")).unwrap();
     fs::write(root.path().join("invalid"), [255, 254]).unwrap();
     assert!(!scan_secrets(root.path(), false).complete);
     fs::remove_file(root.path().join("invalid")).unwrap();

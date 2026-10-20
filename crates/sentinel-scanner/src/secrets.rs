@@ -1,6 +1,7 @@
-use crate::{bounded_read, digest, Diagnostic, Evidence, Finding, Location, ScanReport, Severity};
+use crate::{digest, Diagnostic, Evidence, Finding, Location, ScanReport, Severity};
 use regex::Regex;
 use std::{
+    io::Read,
     path::Path,
     time::{Duration, Instant},
 };
@@ -150,20 +151,54 @@ pub fn scan_secrets(root: &Path, include_ignored: bool) -> ScanReport {
             .chars()
             .flat_map(char::escape_default)
             .collect::<String>();
-        let bytes = match bounded_read(&path, MAX_FILE) {
-            Ok(bytes) => bytes,
-            Err(error) => {
-                incomplete(&mut report, Some(safe_file), error.0);
-                continue;
-            }
-        };
-        total += bytes.len() as u64;
-        if total > MAX_TOTAL {
+        let remaining = MAX_TOTAL.saturating_sub(total);
+        if remaining == 0 {
             incomplete(&mut report, None, "Secrets content budget exceeded");
             break;
         }
+        let file = match std::fs::symlink_metadata(&path).and_then(|metadata| {
+            if !metadata.file_type().is_file() {
+                return Err(std::io::Error::other("not a regular file"));
+            }
+            std::fs::File::open(&path)
+        }) {
+            Ok(file) => file,
+            Err(_) => {
+                incomplete(
+                    &mut report,
+                    Some(safe_file),
+                    "Unable to safely open secrets input",
+                );
+                continue;
+            }
+        };
+        let allowance = (MAX_FILE + 1).min(remaining);
+        let mut bytes = Vec::new();
+        let read = file.take(allowance).read_to_end(&mut bytes);
+        // Count every byte read, including oversized, binary and failed inputs.
+        total += bytes.len() as u64;
+        if read.is_err() {
+            incomplete(&mut report, Some(safe_file), "Unable to read secrets input");
+            continue;
+        }
         if bytes.iter().take(8192).any(|byte| *byte == 0) {
             continue;
+        }
+        if bytes.len() as u64 > MAX_FILE {
+            incomplete(
+                &mut report,
+                Some(safe_file),
+                "Secrets input exceeds 1 MiB size limit",
+            );
+            continue;
+        }
+        if bytes.len() as u64 == allowance && allowance < MAX_FILE + 1 {
+            incomplete(
+                &mut report,
+                None,
+                "Secrets content budget reached before EOF could be established",
+            );
+            break;
         }
         let text = match std::str::from_utf8(&bytes) {
             Ok(text) => text,

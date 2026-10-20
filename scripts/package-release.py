@@ -105,6 +105,8 @@ def verify(directory, smoke=False, expected_commit=None, expected_count=None):
         metadata = json.loads(files[base + "/BUILD.json"])
         if metadata["target"] != target or metadata["version"] != VERSION or expected_commit and metadata["commit"] != expected_commit:
             raise ValueError("Release metadata does not match expected source/target")
+        if metadata["cargo_lock_sha256"] != digest(ROOT / "Cargo.lock"):
+            raise ValueError("Archive dependency lock does not match source")
         if metadata["binary_sha256"] != hashlib.sha256(files[base + "/" + binary_name]).hexdigest():
             raise ValueError("Binary does not match build metadata")
         if smoke:
