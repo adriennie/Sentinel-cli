@@ -109,8 +109,12 @@ enum Command {
         #[command(subcommand)]
         command: AgentCommand,
     },
-    /// Launch a verified Claude session; no operating-system sandbox is provided.
+    /// Launch a provider; Codex/Copilot previews require explicit degraded-hook opt-in.
     Guard {
+        #[arg(long, value_parser=["claude","codex","copilot"])]
+        provider: Option<String>,
+        #[arg(long)]
+        allow_degraded_hooks: bool,
         #[arg(long)]
         scope: Vec<String>,
         #[arg(last = true, default_value = "claude")]
@@ -145,12 +149,18 @@ enum AuditSubcommand {
 #[derive(Subcommand)]
 enum AgentCommand {
     Setup {
-        #[arg(value_parser=["claude"])]
+        #[arg(value_parser=["claude","codex","copilot"])]
         provider: String,
     },
-    Status,
+    Status {
+        #[arg(long, default_value="claude", value_parser=["claude","codex","copilot"])]
+        provider: String,
+    },
     #[command(hide = true)]
-    Hook,
+    Hook {
+        #[arg(long, default_value="claude", value_parser=["claude","codex","copilot"])]
+        provider: String,
+    },
 }
 #[derive(Subcommand)]
 enum ApprovalCommand {
@@ -300,9 +310,11 @@ fn execute_command(
         Command::Doctor => Ok(doctor_result(cli)),
         Command::Agent { ref command } => {
             let result = match command {
-                AgentCommand::Setup { .. } => project.agent_setup(&std::env::current_exe()?)?,
-                AgentCommand::Status => project.agent_status()?,
-                AgentCommand::Hook => {
+                AgentCommand::Setup { provider } => {
+                    project.agent_setup_for(&std::env::current_exe()?, provider)?
+                }
+                AgentCommand::Status { provider } => project.agent_status_for(provider)?,
+                AgentCommand::Hook { .. } => {
                     return Err(sentinel_core::Error::Arguments(
                         "Hook callbacks use the provider protocol",
                     ))
@@ -315,9 +327,9 @@ fn execute_command(
             };
             Ok((
                 format!(
-                    "Agent gate: {}",
+                    "Agent integration: {}",
                     if code == 0 {
-                        "installation verified; use sentinel guard -- claude to activate"
+                        "configuration verified; inspect agent status --format json for enforcement limits"
                     } else {
                         "verification failed"
                     }
@@ -329,8 +341,21 @@ fn execute_command(
         Command::Guard {
             ref program,
             ref scope,
+            ref provider,
+            allow_degraded_hooks,
         } => {
-            let code = project.guard(program, scope.clone())?;
+            let inferred = program
+                .first()
+                .and_then(|s| std::path::Path::new(s).file_stem())
+                .and_then(|s| s.to_str())
+                .filter(|s| matches!(*s, "claude" | "codex" | "copilot"))
+                .unwrap_or("claude");
+            let code = project.guard_for(
+                program,
+                scope.clone(),
+                provider.as_deref().unwrap_or(inferred),
+                allow_degraded_hooks,
+            )?;
             Ok((
                 "Guarded provider exited".into(),
                 sentinel_core::v2("guard", json!({"exit_code":code})),
@@ -631,7 +656,7 @@ fn main() -> ExitCode {
     if matches!(
         cli.command,
         Command::Agent {
-            command: AgentCommand::Hook
+            command: AgentCommand::Hook { .. }
         }
     ) {
         return hook(&cli);
@@ -679,6 +704,27 @@ fn main() -> ExitCode {
 
 fn hook(cli: &Cli) -> ExitCode {
     use std::io::Read;
+    let provider = match &cli.command {
+        Command::Agent {
+            command: AgentCommand::Hook { provider },
+        } => provider.as_str(),
+        _ => "claude",
+    };
+    if let (Ok(active), Ok(nonce), Ok(project)) = (
+        std::env::var("SENTINEL_GUARD_PROVIDER"),
+        std::env::var("SENTINEL_GUARD_NONCE"),
+        Project::resolve(&cli.project, &cli.config),
+    ) {
+        if sentinel_core::agent::Provider::parse(provider).is_ok_and(|configured| {
+            sentinel_core::agent::foreign_session(&project.root, configured, &active, &nonce)
+        }) {
+            return if emit(&json!({})).is_ok() {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(2)
+            };
+        }
+    }
     let evaluate = (|| -> Result<sentinel_core::agent::GateResult, sentinel_core::Error> {
         let mut bytes = Vec::new();
         io::stdin().take(1024 * 1024 + 1).read_to_end(&mut bytes)?;
@@ -690,10 +736,14 @@ fn hook(cli: &Cli) -> ExitCode {
         let nonce = std::env::var("SENTINEL_GUARD_NONCE")
             .map_err(|_| sentinel_core::Error::Security(5, "No guarded session"))?;
         let project = Project::resolve(&cli.project, &cli.config)?;
-        project.hook(&value, &nonce)
+        project.hook_for(&value, &nonce, provider)
     })();
     let (decision,reason)=match evaluate{Ok(r) if matches!(r.decision,sentinel_policy::Decision::Allow|sentinel_policy::Decision::LogOnly)=>("allow",r.code),Ok(r)=>("deny",r.code),Err(_)=>("deny","SENTINEL_FAIL_CLOSED: policy, session, audit, installation, or input verification failed")};
-    let verdict = json!({"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":decision,"permissionDecisionReason":reason}});
+    let verdict = if provider == "copilot" {
+        json!({"permissionDecision":decision,"permissionDecisionReason":reason})
+    } else {
+        json!({"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":decision,"permissionDecisionReason":reason}})
+    };
     if emit(&verdict).is_ok() {
         ExitCode::SUCCESS
     } else {

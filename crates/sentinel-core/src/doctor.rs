@@ -265,5 +265,20 @@ pub fn doctor_at(root: &Path, config: &Path) -> DoctorReport {
     } else {
         report.add("integrations",CheckStatus::Pass,"No active agent gate is claimed; Claude integration is available through explicit setup and guard","Use sentinel agent setup claude, inspect coverage, then sentinel guard -- claude");
     }
+    for provider in ["codex", "copilot"] {
+        if project
+            .root
+            .join(format!(".sentinel/agent/installation-{provider}.json"))
+            .exists()
+        {
+            let healthy = crate::agent::Provider::parse(provider)
+                .ok()
+                .and_then(|p| crate::agent::status_for(&project.root, &project.config, p).ok())
+                .is_some_and(|v| v["healthy"] == true);
+            report.add(if provider=="codex"{"integrations.codex"}else{"integrations.copilot"}, CheckStatus::Warn,
+                if healthy {"Best-effort hook configuration verified; upstream errors/timeouts or missing trust can bypass it"}else{"Provider hook configuration or executable failed verification"},
+                "Inspect agent status --provider; real-client tool execution is not yet validated");
+        }
+    }
     report.finish()
 }

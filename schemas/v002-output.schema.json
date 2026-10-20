@@ -25,42 +25,98 @@
                   "const": "agent"
                 },
                 "result": {
-                  "type": "object",
-                  "properties": {
-                    "schema_version": {
-                      "const": 2
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schema_version": {
+                          "const": 2
+                        },
+                        "healthy": {
+                          "type": "boolean"
+                        },
+                        "adapter": {
+                          "const": "claude-pretooluse-v2"
+                        },
+                        "minimum_claude_version": {
+                          "type": "string"
+                        },
+                        "coverage": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "limitations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "schema_version",
+                        "healthy",
+                        "adapter",
+                        "minimum_claude_version",
+                        "coverage",
+                        "limitations"
+                      ],
+                      "additionalProperties": false
                     },
-                    "healthy": {
-                      "type": "boolean"
-                    },
-                    "adapter": {
-                      "const": "claude-pretooluse-v2"
-                    },
-                    "minimum_claude_version": {
-                      "type": "string"
-                    },
-                    "coverage": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "limitations": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schema_version": {
+                          "const": 2
+                        },
+                        "healthy": {
+                          "type": "boolean"
+                        },
+                        "provider": {
+                          "enum": [
+                            "codex",
+                            "copilot"
+                          ]
+                        },
+                        "adapter": {
+                          "enum": [
+                            "codex-pretooluse-v2",
+                            "copilot-pretooluse-v2"
+                          ]
+                        },
+                        "enforcement": {
+                          "const": "best_effort"
+                        },
+                        "client_validation": {
+                          "const": "protocol_fixtures_only"
+                        },
+                        "coverage": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "limitations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "schema_version",
+                        "healthy",
+                        "provider",
+                        "adapter",
+                        "enforcement",
+                        "client_validation",
+                        "coverage",
+                        "limitations"
+                      ],
+                      "additionalProperties": false
                     }
-                  },
-                  "required": [
-                    "schema_version",
-                    "healthy",
-                    "adapter",
-                    "minimum_claude_version",
-                    "coverage",
-                    "limitations"
-                  ],
-                  "additionalProperties": false
+                  ]
                 },
                 "audit_logging": {
                   "enum": [
@@ -143,7 +199,11 @@
                             "pattern": "^[a-f0-9]{64}$"
                           },
                           "actor": {
-                            "const": "claude"
+                            "enum": [
+                              "claude",
+                              "codex",
+                              "copilot"
+                            ]
                           },
                           "session_hash": {
                             "type": "string",

@@ -42,8 +42,10 @@ fn records(root: &Path) -> Result<Vec<Record>> {
         }
         let r: Record =
             serde_json::from_slice(line).map_err(|_| "Decision journal record is malformed")?;
-        if !matches!(r.actor.as_str(), "claude" | "operator")
-            || r.schema_version != 2
+        if !matches!(
+            r.actor.as_str(),
+            "claude" | "codex" | "copilot" | "operator"
+        ) || r.schema_version != 2
             || r.sequence != records.len() as u64 + 1
             || r.previous_hash != previous
             || r.risk_score != sentinel_policy::risk_score(&r.risk_evidence)

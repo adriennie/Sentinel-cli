@@ -44,7 +44,7 @@ fn load(root: &Path) -> Result<Vec<Approval>> {
     for a in &values {
         let hex = |s: &str| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit());
         if a.schema_version != 2
-            || a.actor != "claude"
+            || !matches!(a.actor.as_str(), "claude" | "codex" | "copilot")
             || uuid::Uuid::parse_str(&a.id).is_err()
             || !hex(&a.binding)
             || !hex(&a.session_hash)
@@ -125,7 +125,7 @@ pub(crate) fn request_or_consume(
     let mut values = load(root)?;
     if let Some(a) = values.iter_mut().find(|a| a.binding == binding) {
         if a.schema_version != 2
-            || a.actor != "claude"
+            || a.actor != action.agent_id
             || a.session_hash != hash(action.session_id.as_bytes())
             || a.action_hash != action.arguments_hash
             || a.expires_at <= now()
@@ -145,7 +145,7 @@ pub(crate) fn request_or_consume(
         return Err("Approval capacity reached; archive expired state manually");
     }
     let id = uuid::Uuid::new_v4().to_string();
-    values.push(Approval{schema_version:2,id:id.clone(),binding:binding.into(),actor:"claude".into(),session_hash:hash(action.session_id.as_bytes()),action_hash:action.arguments_hash.clone(),paths:action.target_paths.iter().map(|p|redacted(p)).collect(),operation:action.action_type,expires_at:now()+300,status:ApprovalStatus::Pending,matched_rules:rules.iter().map(|r|if r.len()<=64&&r.bytes().all(|b|b.is_ascii_alphanumeric()||b"._-".contains(&b)){redacted(r)}else{"[REDACTED rule identifier]".into()}).collect(),risk_score:sentinel_policy::risk_score(evidence),risk_evidence:evidence.clone(),risk_explanation:"Deterministic evidence score; explicit denial is never overridden by approval".into(),preview:"[REDACTED proposed tool arguments/content; review the original request in the trusted client]".into()});
+    values.push(Approval{schema_version:2,id:id.clone(),binding:binding.into(),actor:action.agent_id.into(),session_hash:hash(action.session_id.as_bytes()),action_hash:action.arguments_hash.clone(),paths:action.target_paths.iter().map(|p|redacted(p)).collect(),operation:action.action_type,expires_at:now()+300,status:ApprovalStatus::Pending,matched_rules:rules.iter().map(|r|if r.len()<=64&&r.bytes().all(|b|b.is_ascii_alphanumeric()||b"._-".contains(&b)){redacted(r)}else{"[REDACTED rule identifier]".into()}).collect(),risk_score:sentinel_policy::risk_score(evidence),risk_evidence:evidence.clone(),risk_explanation:"Deterministic evidence score; explicit denial is never overridden by approval".into(),preview:"[REDACTED proposed tool arguments/content; review the original request in the trusted client]".into()});
     atomic(&file(root)?, &values)?;
     Ok((id, false))
 }

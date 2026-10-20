@@ -12,6 +12,81 @@ fn agent_error(e: &'static str) -> Error {
     Error::Security(1, e)
 }
 impl Project {
+    pub fn agent_setup_for(&self, binary: &Path, provider: &str) -> Result<Value, Error> {
+        let policy = self.check()?;
+        if !policy.audit.enabled {
+            return Err(Error::Security(3, "Agent audit logging is required"));
+        }
+        agent::setup_for(
+            &self.root,
+            &self.config,
+            binary,
+            agent::Provider::parse(provider).map_err(agent_error)?,
+        )
+        .map_err(agent_error)
+    }
+    pub fn agent_status_for(&self, provider: &str) -> Result<Value, Error> {
+        agent::status_for(
+            &self.root,
+            &self.config,
+            agent::Provider::parse(provider).map_err(agent_error)?,
+        )
+        .map_err(agent_error)
+    }
+    pub fn guard_for(
+        &self,
+        program: &[String],
+        scope: Vec<String>,
+        provider: &str,
+        degraded: bool,
+    ) -> Result<u8, Error> {
+        if !self.check()?.audit.enabled {
+            return Err(Error::Security(3, "Agent audit logging is required"));
+        }
+        Ok(
+            if agent::guarded_for(
+                &self.root,
+                &self.config,
+                program,
+                scope,
+                agent::Provider::parse(provider).map_err(agent_error)?,
+                degraded,
+            )
+            .map_err(agent_error)?
+            .success()
+            {
+                0
+            } else {
+                1
+            },
+        )
+    }
+    pub fn hook_for(
+        &self,
+        input: &Value,
+        nonce: &str,
+        provider: &str,
+    ) -> Result<agent::GateResult, Error> {
+        let result = (|| {
+            let policy = self.check()?;
+            if !policy.audit.enabled {
+                return Err(Error::Security(5, "Agent audit logging is required"));
+            }
+            agent::gate_for(
+                &self.root,
+                &self.config,
+                &policy,
+                input,
+                nonce,
+                agent::Provider::parse(provider).map_err(agent_error)?,
+            )
+            .map_err(agent_error)
+        })();
+        if result.is_err() {
+            let _ = self.record_command(crate::AuditCommand::Audit, 5, None, None);
+        }
+        result
+    }
     pub fn agent_setup(&self, binary: &Path) -> Result<Value, Error> {
         let p = self.check()?;
         if !p.audit.enabled {

@@ -1,4 +1,8 @@
 //! Hook policy gate, not process containment. No provider-specific data enters policy.
+mod providers;
+pub use providers::{
+    foreign_session, guarded_for, setup_for, status_for, CodexAdapter, CopilotAdapter, Provider,
+};
 mod approvals;
 mod claude;
 mod journal;
@@ -111,6 +115,9 @@ pub struct Session {
     pub actor: String,
 }
 pub fn begin_session(root: &Path, scope: Vec<String>) -> Result<Session> {
+    begin_session_for(root, scope, Provider::Claude)
+}
+pub fn begin_session_for(root: &Path, scope: Vec<String>, provider: Provider) -> Result<Session> {
     let _lock = locked(root)?;
     for s in &scope {
         if s.starts_with('/') || s.contains(['\\', ':']) || s.split('/').any(|p| p == "..") {
@@ -130,7 +137,7 @@ pub fn begin_session(root: &Path, scope: Vec<String>) -> Result<Session> {
         nonce: uuid::Uuid::new_v4().to_string(),
         created: now(),
         scope,
-        actor: "claude".into(),
+        actor: provider.name().into(),
     };
     atomic(&directory(root)?.join("session.json"), &s)?;
     Ok(s)
@@ -339,8 +346,18 @@ pub fn gate(
     input: &Value,
     nonce: &str,
 ) -> Result<GateResult> {
+    gate_for(root, config, policy, input, nonce, Provider::Claude)
+}
+pub fn gate_for(
+    root: &Path,
+    config: &Path,
+    policy: &Policy,
+    input: &Value,
+    nonce: &str,
+    provider: Provider,
+) -> Result<GateResult> {
     let _lock = locked(root)?;
-    if !status(root, config)?.healthy {
+    if status_for(root, config, provider)?["healthy"] != true {
         return Err("Agent installation integrity failed");
     }
     sentinel_audit::Store::new(root)
@@ -352,12 +369,16 @@ pub fn gate(
     if s.nonce != nonce
         || now().saturating_sub(s.created) > 8 * 3600
         || s.created > now()
-        || s.actor != "claude"
+        || s.actor != provider.name()
     {
         return Err("Guarded session is missing or expired");
     }
     journal::verify_locked(root)?;
-    let action = ClaudeAdapter.normalize(root, input, &s.scope)?;
+    let action = match provider {
+        Provider::Claude => ClaudeAdapter.normalize(root, input, &s.scope)?,
+        Provider::Codex => CodexAdapter.normalize(root, input, &s.scope)?,
+        Provider::Copilot => CopilotAdapter.normalize(root, input, &s.scope)?,
+    };
     let evaluated = policy
         .evaluate(&sentinel_policy::ActionContext {
             action_type: action.action_type,
@@ -395,7 +416,7 @@ pub fn gate(
             .ok()
             .map(|p| folded_path(&p.to_string_lossy().replace('\\', "/")))
     });
-    let executable = claude::installed_binary(root)?;
+    let executable = providers::binary(root, provider)?;
     let binary = executable
         .strip_prefix(root)
         .ok()
@@ -403,10 +424,16 @@ pub fn gate(
     let protected = action.target_paths.iter().any(|p| {
         let p = folded_path(p);
         p == "sentinel.yml"
-            || matches!(p.as_str(), ".git" | ".sentinel" | ".claude")
+            || matches!(
+                p.as_str(),
+                ".git" | ".sentinel" | ".claude" | ".codex" | ".github/hooks" | ".github/copilot"
+            )
             || p.starts_with(".git/")
             || p.starts_with(".sentinel/")
             || p.starts_with(".claude/")
+            || p.starts_with(".codex/")
+            || p.starts_with(".github/hooks/")
+            || p.starts_with(".github/copilot/")
             || selected_config.as_ref() == Some(&p)
             || binary.as_ref() == Some(&p)
     });

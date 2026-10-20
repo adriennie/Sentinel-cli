@@ -126,7 +126,7 @@ fn settings(root: &Path) -> Result<(PathBuf, Value)> {
     };
     Ok((path, value))
 }
-fn binary_bytes(path: &Path) -> Result<Vec<u8>> {
+pub(crate) fn binary_bytes(path: &Path) -> Result<Vec<u8>> {
     let metadata = path
         .symlink_metadata()
         .map_err(|_| "Sentinel executable is unavailable")?;
@@ -251,7 +251,7 @@ pub fn status(root: &Path, config: &Path) -> Result<Installation> {
             .is_some_and(|a| a.contains(&state.hook));
     Ok(Installation{schema_version:2,healthy,adapter:"claude-pretooluse-v2",minimum_claude_version:"2.1.295",coverage:vec!["Read, Write, Edit, NotebookEdit paths within the selected project","Bash and PowerShell denied: indirect writes are not safely inspectable","Network tools use deterministic policy; unknown tools are denied","External exact-action approvals, five-minute expiry, single consumption"],limitations:vec!["Hooks are not an operating-system sandbox","Same-user processes can alter state; external filesystem protection is required against that threat","No containment of already-running processes, plugins, external clients or hook-disabling users","Provider version and hook health must be checked by sentinel guard; setup alone is not active enforcement"]})
 }
-fn executable(value: &str, root: &Path) -> Result<PathBuf> {
+pub(crate) fn executable(value: &str, root: &Path) -> Result<PathBuf> {
     let requested = Path::new(value);
     let candidates = if requested.components().count() > 1 {
         vec![requested.to_path_buf()]
@@ -369,6 +369,7 @@ pub fn guarded(
         .env_remove("CLAUDE_CODE_DISABLE_HOOKS")
         .env_remove("CLAUDE_CODE_DISABLE_ALL_HOOKS")
         .current_dir(root)
+        .env("SENTINEL_GUARD_PROVIDER", "claude")
         .env("SENTINEL_GUARD_NONCE", &session.nonce)
         .env("SENTINEL_GUARD_PROJECT", root)
         .status()
