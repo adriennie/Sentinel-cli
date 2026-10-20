@@ -8,7 +8,7 @@ sentinel scan --fail-on critical
 sentinel scan --sbom ./bom.json --format json
 ```
 
-This milestone scans resolved dependencies only. It does not run package managers, build scripts, source-code analysis, or secrets scanning. `scan` currently defaults to `--type dependencies`; `--type secrets` remains unavailable. An initialized, valid policy with `scanning.dependencies: true` is required. CLI `--offline` or policy `scanning.offline: true` disables network access.
+Dependency scanning inspects resolved package identities. It does not run package managers, build scripts, or source-code analysis. Unqualified `scan` also runs policy-enabled local secrets scanning; use `--type dependencies` to select only dependency lookup. An initialized, valid policy with `scanning.dependencies: true` is required. CLI `--offline` or policy `scanning.offline: true` disables network access.
 
 ## Coverage
 
@@ -41,7 +41,7 @@ The client uses the [official version-query API](https://google.github.io/osv.de
 
 Cache records are atomically written under `.sentinel/cache/osv-v1/`, keyed by a SHA-256 hash of the exact package identity. Both vulnerable and empty successful responses are cached with a UNIX timestamp. Fresh entries (at most 24 hours old) are reused online and offline; cache ages appear in the report. Corrupt, mismatched, future-dated, unavailable, or missing cache data cannot produce a complete offline scan. Stale records retain findings but make an offline scan incomplete. Failed online refreshes can retain stale findings and remain incomplete. Cache-write failures are reported as incomplete too. Cache files are local intelligence, not tamper-evident evidence; deleting the cache forces a fresh online lookup. Symlink cache directories and input files are rejected, but this is not an OS sandbox against concurrent filesystem tampering.
 
-OSV advisory IDs remain distinct; aliases between different advisories are not merged. Withdrawn advisories are omitted. Severity is the maximum supported OSV categorical label or computed CVSS v3 base score, including package-specific severity. Missing, malformed, CVSS v2-only, or CVSS v4-only severity remains `unknown` when no supported severity is present. Unknown severity conservatively exceeds every failure threshold. Findings have stable IDs, `DEP-001`, OSV evidence, remediation guidance, and reachability `not_analyzed`. Raw advisory descriptions and lockfile parser excerpts are omitted.
+OSV advisory IDs remain distinct; aliases between different advisories are not merged. Withdrawn advisories are omitted. Maintenance information is classified only from explicit top-level or matching package-specific advisory metadata; unclassified advisory types remain visible with a generic security-advisory title. Legacy cache entries default to unclassified. Threshold behavior remains conservative and no maintenance advisories are silently suppressed. Severity is the maximum supported OSV categorical label or computed CVSS v3 base score, including package-specific severity. Missing, malformed, CVSS v2-only, or CVSS v4-only severity remains `unknown` when no supported severity is present. Unknown severity conservatively exceeds every failure threshold. Findings have stable IDs, `DEP-001`, OSV evidence, remediation guidance, and reachability `not_analyzed`. Raw advisory descriptions and lockfile parser excerpts are omitted.
 
 ## Results and exit codes
 

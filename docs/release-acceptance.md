@@ -1,36 +1,29 @@
 # v0.0.1 release acceptance
 
-Run from a checkout with the pinned Rust toolchain and Python 3 available:
+Run `python3 scripts/check-release.py` with the pinned Rust toolchain and Python 3 available. This checks formatting, Clippy, all Rust tests and command contracts, packaging negative tests, locked release compilation, temporary CLI installation, and installed-binary initialization, policies, scans, actual synthetic-secret detection/redaction, doctor, and audit history. Required test fixtures use no live vulnerability APIs. `--readiness-only` checks an existing binary; `--readiness-only --binary PATH` checks an extracted archive binary.
 
-```sh
-python3 scripts/check-release.py
-```
+## Required evidence
 
-This runs formatting, Clippy with warnings denied, all workspace tests (including JSON Schema contracts and local HTTP mocks), and a locked release build. It then installs the CLI into a temporary directory and checks the installed binary's version, initialization, policy validation, offline scanning, doctor diagnostics, and audit history. It uses only synthetic local fixtures; no live vulnerability API is required. The temporary installation and fixture are removed afterward. To inspect an already-built release binary without repeating build/test/install checks:
+| Gate | Evidence |
+| --- | --- |
+| INIT-001/002 | Initialization, all levels, preservation/replacement, custom paths and filesystem-failure tests |
+| POL-001–004 | Valid/invalid schema, rule semantics, precedence, path normalization and YAML resource-budget tests |
+| SCAN-001 | Mock OSV findings, exact package identities and advisory evidence |
+| SCAN-002 | Synthetic credential families, redaction across text/JSON/stderr/audit, and installed-binary secret smoke test |
+| SCAN-003/004 | Missing/stale/corrupt intelligence, API failures, clean supported fixtures and bounded secrets coverage |
+| OUT-001 | Actual command/event outputs validated against committed schemas, plus negative contracts |
+| AUD-001 | Numeric redacted events, failure outcomes, concurrency, filtering and malformed history tests |
+| CLI-001 | Help/version, flags, argument/configuration errors, stdout/stderr and exit codes |
+| CI-001 | Exact-commit successful native jobs for Linux x64, Windows x64, Intel Mac and Apple Silicon |
+| Dependency review | `docs/dependency-review.json` matching Cargo.lock, current within 24 hours, complete and finding-free |
+| Distribution | Four native archives, matching BUILD.json provenance, extracted-binary smoke tests and SHA256SUMS verification |
 
-```sh
-python3 scripts/check-release.py --readiness-only
-```
+The YAML migration removes serde_yaml_ng and unsafe-libyaml rather than ignoring their advisory. Explicit maintenance metadata produces maintenance findings; unclassified advisory types retain a generic title and conservative failure behavior. `scripts/verify-dependency-review.py` rejects stale, incomplete or mismatched review evidence. Required CI fixtures remain offline; refreshing dependency review is a separate live OSV action.
 
-The gate exits 1 with explicit blockers if a required implemented capability is missing. This is deliberate: passing tests for available features must not imply a complete release. No command tags, publishes, or uploads a release.
+## Packaging and draft handoff
 
-## Acceptance coverage
+`scripts/package-release.py build --target TARGET` collects upstream legal notices, packages the native binary, license, install instructions, changelog and BUILD.json, and generates SHA256SUMS. `verify --smoke --expected-commit SHA --expected-count 1` verifies that runner's archive and exercises its extracted binary. The aggregate job requires all four target jobs, verifies all four archives and their source SHA, and generates `release-evidence.json` with the workflow URL, exact commit, targets, Cargo.lock hash and checksum-file hash.
 
-| Gate | Verification | Current state |
-| --- | --- | --- |
-| INIT-001/002 | CLI initialization, all levels, preservation and replacement tests | Implemented |
-| POL-001–004 | Strict schema, invalid rules, precedence and path hardening tests | Implemented |
-| SCAN-001 | Mock OSV findings, exact identities and advisory evidence | Implemented |
-| SCAN-002 | Synthetic secret detection and redaction | **Blocked: secrets scanner missing** |
-| SCAN-003/004 | Incomplete cache/API behavior and clean supported fixtures | Implemented |
-| OUT-001 | Audit/doctor/event JSON Schema tests; existing scan/init/error regressions | Implemented for available features; secrets contract pending |
-| AUD-001 | Redacted completion events, failure outcomes, concurrent writers, history filters | Implemented |
-| CLI-001 | Help, version, invalid arguments, stdout/stderr and exit codes | Implemented |
-| CI-001 | Linux/macOS/Windows formatting, Clippy, tests and release-build workflow | Configured; actual platform runs must be confirmed before tagging |
-| Installation | Temporary locked CLI install and installed-binary smoke tests | Included in local gate |
-| Dependency review | Review reported advisories and maintenance risks | Open: previously observed RUSTSEC-2024-0449 through the YAML parser |
-| Distribution | Release artifacts, checksums and release notes | Pending |
+The CI `release-bundle` artifact contains the four archives, SHA256SUMS and release-evidence.json. A draft release is created only from a successful exact-commit run and those verified assets. An existing conflicting tag or release must never be overwritten. The draft remains unpublished. Local success alone does not satisfy CI-001 or establish that a draft release exists.
 
-A complete v0.0.1 release is **not ready** while SCAN-002 and its output contract remain unimplemented. Audit logs have no integrity guarantee, agent enforcement is absent, and OSV coverage is limited to documented inputs/ecosystems. Keep those limitations in release notes.
-
-The automated local gate checks available functionality and required capability declarations. Dependency-risk decisions, actual supported-platform CI results, and distribution readiness remain explicit review gates; the script does not manufacture evidence for them.
+Supported targets: x86_64-unknown-linux-gnu, x86_64-pc-windows-msvc, x86_64-apple-darwin, and aarch64-apple-darwin. Binaries are unsigned and not notarized; checksums are not independent signatures. Agent enforcement, reachability, audit integrity and universal language/project coverage are not provided.

@@ -1,6 +1,6 @@
 # Sentinel CLI
 
-Sentinel is a local-first security CLI. This v0.0.1 foundation initializes and validates project policies and exposes a deterministic Rust policy evaluator. It also scans resolved dependencies against OSV through Cargo/npm lockfiles or a supplied CycloneDX SBOM. It also records local audit events and provides offline doctor diagnostics. It does not intercept agent actions or scan secrets.
+Sentinel is a local-first security CLI. This v0.0.1 foundation initializes and validates project policies and exposes a deterministic Rust policy evaluator. It also scans resolved dependencies against OSV through Cargo/npm lockfiles or a supplied CycloneDX SBOM. It also records local audit events and provides offline doctor diagnostics. It detects common exposed credential patterns locally. It does not intercept agent actions.
 
 ## Installation
 
@@ -45,7 +45,7 @@ Errors contain `schema_version`, `status: "error"`, and `error: {code, message}`
 
 See [the policy reference](docs/policy-reference.md). Policy evaluation is a library capability; CLI commands only initialize and validate configuration. L0 logs protected writes, L1/L2 require approval, L3 denies all direct writes, and L2/L3 deny shell/network actions. These decisions do not provide runtime enforcement.
 
-Dependency scanning honors the generated dependency/offline settings. See [dependency scanning](docs/dependency-scanning.md) for native and SBOM ecosystem support, cache behavior, limits, and coverage semantics. See [audit and doctor](docs/audit-and-doctor.md) for event storage, diagnostics, JSON contracts, failure behavior, and limitations. Secrets scanning remains deferred. There are no agent integrations, approval prompts, or sandbox controls.
+Dependency scanning honors the generated dependency/offline settings. See [dependency scanning](docs/dependency-scanning.md) for native and SBOM ecosystem support, cache behavior, limits, and coverage semantics. See [audit and doctor](docs/audit-and-doctor.md) for event storage, diagnostics, JSON contracts, failure behavior, and limitations. See [secrets scanning](docs/secrets-scanning.md) for supported patterns, redaction, ignore behavior, and coverage limits. Unqualified `scan` now runs both enabled scanners. There are no agent integrations, approval prompts, or sandbox controls.
 
 ## Development
 
@@ -56,4 +56,4 @@ cargo test --locked --workspace
 cargo build --locked --workspace --release
 ```
 
-CI is configured to run these checks on Linux, macOS, and Windows. Run `python3 scripts/check-release.py` for local release checks and a temporary installation smoke test; it currently reports release readiness blocked by missing secrets scanning. See [release acceptance](docs/release-acceptance.md). See [the development checklist](docs/development-checklist.md) for milestone status. Original design documents and diagrams describe the larger roadmap.
+CI is configured to run these checks on Linux, macOS, and Windows. Run `python3 scripts/check-release.py` for local release checks and a temporary installation smoke test; it checks actual synthetic-secret detection and redaction before reporting local readiness. See [release acceptance](docs/release-acceptance.md). Prebuilt release archives include licensing notices and installation instructions; see [INSTALL.md](INSTALL.md). See [the development checklist](docs/development-checklist.md) for milestone status. Original design documents and diagrams describe the larger roadmap.

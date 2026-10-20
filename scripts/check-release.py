@@ -19,6 +19,7 @@ def run(arguments, **kwargs):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--readiness-only", action="store_true", help="Inspect the existing release binary without rebuilding")
+    parser.add_argument("--binary", type=Path, help="Use an extracted release binary for readiness-only smoke tests")
     args = parser.parse_args()
     if not args.readiness_only:
         for arguments in [
@@ -28,7 +29,12 @@ def main():
             ["cargo", "build", "--locked", "--workspace", "--release"],
         ]:
             run(arguments)
+        run([sys.executable, "-m", "unittest", "discover", "-s", "scripts", "-p", "test_*.py"])
     binary = ROOT / "target" / "release" / ("sentinel.exe" if os.name == "nt" else "sentinel")
+    if args.binary is not None:
+        if not args.readiness_only:
+            parser.error("--binary requires --readiness-only")
+        binary = args.binary.resolve()
     if not binary.is_file():
         print("BLOCKED: release binary missing; build it before checking readiness", file=sys.stderr)
         return 1
@@ -44,6 +50,16 @@ def main():
         (project / "Cargo.lock").write_text('version = 4\n[[package]]\nname = "local-fixture"\nversion = "0.1.0"\n', encoding="utf-8")
         run([str(binary), "policy", "check", "--project", str(project), "--quiet"])
         run([str(binary), "scan", "--offline", "--project", str(project), "--quiet"])
+        secret = "ghp_" + "A" * 36
+        secret_file = project / "synthetic-secret.txt"
+        secret_file.write_text(secret, encoding="utf-8")
+        secret_result = subprocess.run([str(binary), "scan", "--type", "secrets", "--project", str(project), "--format=json"], capture_output=True, text=True)
+        assert secret_result.returncode == 4, "Synthetic secret was not detected"
+        assert secret not in secret_result.stdout + secret_result.stderr, "Secret leaked in command output"
+        secret_report = json.loads(secret_result.stdout)["data"]
+        assert secret_report["complete"] and secret_report["findings"][0]["evidence"]["redacted"] == "[REDACTED]"
+        assert secret not in (project / ".sentinel" / "audit.jsonl").read_text(encoding="utf-8"), "Secret leaked in audit log"
+        secret_file.unlink()
         result = run([str(binary), "doctor", "--project", str(project), "--format=json"], capture_output=True, text=True)
         report = json.loads(result.stdout)["data"]
         history = run([str(binary), "audit", "--project", str(project), "--format=json"], capture_output=True, text=True)
@@ -55,7 +71,7 @@ def main():
         if report["status"] == "fail":
             blockers.append("Doctor diagnostics failed")
         if blockers:
-            print("Implementation checks passed for available features. Release readiness: BLOCKED.")
+            print("Implementation checks completed. Release readiness: BLOCKED.")
             for blocker in blockers:
                 print("- " + blocker)
             return 1

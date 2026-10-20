@@ -1,0 +1,912 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "status": {
+          "const": "ok"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "config": {
+                  "type": "string"
+                },
+                "level": {
+                  "enum": [
+                    "L0",
+                    "L1",
+                    "L2",
+                    "L3"
+                  ]
+                },
+                "rules": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "audit_logging": {
+                  "enum": [
+                    "recorded",
+                    "disabled",
+                    "failed"
+                  ]
+                }
+              },
+              "required": [
+                "config",
+                "level",
+                "audit_logging"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "schema_version": {
+                  "const": 1
+                },
+                "coverage": {
+                  "enum": [
+                    "provided_sbom_components",
+                    "supported_registry_dependencies",
+                    "supported_text_files",
+                    "configured_scanners"
+                  ]
+                },
+                "inputs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "status": {
+                  "enum": [
+                    "complete",
+                    "incomplete"
+                  ]
+                },
+                "complete": {
+                  "type": "boolean"
+                },
+                "packages_discovered": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "packages_checked": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "files_checked": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "findings": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "schema_version": {
+                            "const": 1
+                          },
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[0-9a-f]{64}$"
+                          },
+                          "rule_id": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "enum": [
+                              "unknown",
+                              "low",
+                              "medium",
+                              "high",
+                              "critical"
+                            ]
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "files": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "remediation": {
+                            "type": "string"
+                          },
+                          "reachability": {
+                            "const": "not_analyzed"
+                          },
+                          "category": {
+                            "enum": [
+                              "dependency_vulnerability",
+                              "dependency_maintenance",
+                              "dependency_advisory"
+                            ]
+                          },
+                          "package": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "string"
+                              },
+                              "ecosystem": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "version",
+                              "ecosystem"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "evidence": {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "const": "OSV"
+                              },
+                              "advisory_id": {
+                                "type": "string"
+                              },
+                              "advisory_kind": {
+                                "enum": [
+                                  "vulnerability",
+                                  "maintenance",
+                                  "unknown"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "advisory_id",
+                              "advisory_kind"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "schema_version",
+                          "id",
+                          "rule_id",
+                          "severity",
+                          "title",
+                          "files",
+                          "remediation",
+                          "reachability",
+                          "category",
+                          "package",
+                          "evidence"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "schema_version": {
+                            "const": 1
+                          },
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[0-9a-f]{64}$"
+                          },
+                          "rule_id": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "enum": [
+                              "unknown",
+                              "low",
+                              "medium",
+                              "high",
+                              "critical"
+                            ]
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "files": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "remediation": {
+                            "type": "string"
+                          },
+                          "reachability": {
+                            "const": "not_analyzed"
+                          },
+                          "category": {
+                            "const": "secret"
+                          },
+                          "location": {
+                            "type": "object",
+                            "properties": {
+                              "file": {
+                                "type": "string"
+                              },
+                              "line": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "column": {
+                                "type": "integer",
+                                "minimum": 1
+                              }
+                            },
+                            "required": [
+                              "file",
+                              "line",
+                              "column"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "evidence": {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "const": "Sentinel"
+                              },
+                              "redacted": {
+                                "const": "[REDACTED]"
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "redacted"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "schema_version",
+                          "id",
+                          "rule_id",
+                          "severity",
+                          "title",
+                          "files",
+                          "remediation",
+                          "reachability",
+                          "category",
+                          "location",
+                          "evidence"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "maxItems": 100000
+                },
+                "diagnostics": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "package": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "string"
+                              },
+                              "ecosystem": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "version",
+                              "ecosystem"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "file": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "code": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "package",
+                      "file",
+                      "code",
+                      "message"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "cache": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "package": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "string"
+                          },
+                          "ecosystem": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "version",
+                          "ecosystem"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "age_seconds": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "stale": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "package",
+                      "age_seconds",
+                      "stale"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "audit_logging": {
+                  "enum": [
+                    "recorded",
+                    "disabled",
+                    "failed"
+                  ]
+                }
+              },
+              "required": [
+                "schema_version",
+                "coverage",
+                "inputs",
+                "status",
+                "complete",
+                "packages_discovered",
+                "packages_checked",
+                "files_checked",
+                "findings",
+                "diagnostics",
+                "cache",
+                "audit_logging"
+              ],
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "complete": {
+                        "const": true
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "status": {
+                        "const": "complete"
+                      }
+                    }
+                  },
+                  "else": {
+                    "properties": {
+                      "status": {
+                        "const": "incomplete"
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "schema_version": {
+                  "const": 1
+                },
+                "events": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "schema_version": {
+                        "const": 1
+                      },
+                      "event_id": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                      },
+                      "session_id": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                      },
+                      "timestamp": {
+                        "type": "string",
+                        "format": "date-time",
+                        "maxLength": 40
+                      },
+                      "event_type": {
+                        "enum": [
+                          "command.completed",
+                          "policy.validated",
+                          "scan.completed"
+                        ]
+                      },
+                      "command": {
+                        "enum": [
+                          "init",
+                          "policy.check",
+                          "scan",
+                          "doctor",
+                          "audit"
+                        ]
+                      },
+                      "outcome": {
+                        "enum": [
+                          "success",
+                          "failure",
+                          "findings",
+                          "incomplete"
+                        ]
+                      },
+                      "exit_code": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 8
+                      },
+                      "packages_checked": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "findings_count": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "schema_version",
+                      "event_id",
+                      "session_id",
+                      "timestamp",
+                      "event_type",
+                      "command",
+                      "outcome",
+                      "exit_code",
+                      "packages_checked",
+                      "findings_count"
+                    ],
+                    "additionalProperties": false,
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "exit_code": {
+                              "const": 0
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "outcome": {
+                              "const": "success"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "if": {
+                          "properties": {
+                            "exit_code": {
+                              "const": 4
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "outcome": {
+                              "const": "findings"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "if": {
+                          "properties": {
+                            "exit_code": {
+                              "const": 7
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "outcome": {
+                              "const": "incomplete"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "if": {
+                          "properties": {
+                            "exit_code": {
+                              "not": {
+                                "enum": [
+                                  0,
+                                  4,
+                                  7
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "outcome": {
+                              "const": "failure"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "if": {
+                          "properties": {
+                            "event_type": {
+                              "const": "policy.validated"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "command": {
+                              "const": "policy.check"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "if": {
+                          "properties": {
+                            "event_type": {
+                              "const": "scan.completed"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "command": {
+                              "const": "scan"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "maxItems": 10000
+                },
+                "malformed_records": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "complete": {
+                  "type": "boolean"
+                },
+                "audit_logging": {
+                  "enum": [
+                    "recorded",
+                    "disabled",
+                    "failed"
+                  ]
+                }
+              },
+              "required": [
+                "schema_version",
+                "events",
+                "malformed_records",
+                "complete",
+                "audit_logging"
+              ],
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "malformed_records": {
+                        "const": 0
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "complete": {
+                        "const": true
+                      }
+                    }
+                  },
+                  "else": {
+                    "properties": {
+                      "complete": {
+                        "const": false
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "schema_version": {
+                  "const": 1
+                },
+                "binary_version": {
+                  "type": "string"
+                },
+                "policy_schema_version": {
+                  "const": 1
+                },
+                "status": {
+                  "enum": [
+                    "pass",
+                    "warn",
+                    "fail"
+                  ]
+                },
+                "checks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "enum": [
+                          "binary.version",
+                          "project.discovery",
+                          "policy.configuration",
+                          "audit.storage",
+                          "audit.history",
+                          "scanner.dependencies",
+                          "cache.storage",
+                          "cache.intelligence",
+                          "scanner.secrets",
+                          "integrations"
+                        ]
+                      },
+                      "status": {
+                        "enum": [
+                          "pass",
+                          "warn",
+                          "fail"
+                        ]
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "remediation": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "status",
+                      "message",
+                      "remediation"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 2
+                },
+                "capabilities": {
+                  "type": "object",
+                  "properties": {
+                    "dependency_scanning": {
+                      "type": "boolean"
+                    },
+                    "secrets_scanning": {
+                      "type": "boolean"
+                    },
+                    "audit_logging": {
+                      "type": "boolean"
+                    },
+                    "agent_enforcement": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "dependency_scanning",
+                    "secrets_scanning",
+                    "audit_logging",
+                    "agent_enforcement"
+                  ],
+                  "additionalProperties": false
+                },
+                "dependency_cache": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "packages_total": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "packages_inspected": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "available": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "stale": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "missing_or_invalid": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "packages_total",
+                        "packages_inspected",
+                        "available",
+                        "stale",
+                        "missing_or_invalid"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "exit_code": {
+                  "enum": [
+                    0,
+                    1,
+                    3
+                  ]
+                },
+                "audit_logging": {
+                  "enum": [
+                    "recorded",
+                    "disabled",
+                    "failed"
+                  ]
+                }
+              },
+              "required": [
+                "schema_version",
+                "binary_version",
+                "policy_schema_version",
+                "status",
+                "checks",
+                "capabilities",
+                "dependency_cache",
+                "exit_code"
+              ],
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "const": "fail"
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "exit_code": {
+                        "enum": [
+                          1,
+                          3
+                        ]
+                      }
+                    }
+                  },
+                  "else": {
+                    "properties": {
+                      "exit_code": {
+                        "const": 0
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "status",
+        "message",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "status": {
+          "const": "error"
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "status",
+        "error"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

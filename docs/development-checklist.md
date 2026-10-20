@@ -2,24 +2,20 @@
 
 ## Implemented
 
-- [x] Rust workspace and versioned `sentinel` binary
-- [x] Commands, global flags, help, and consistent text/JSON output
-- [x] Atomic project initialization and configurable L0–L3 policies
-- [x] Strict policy validation and typed deterministic evaluator
-- [x] Unit tests and CLI integration/regression tests
-- [x] Linux, macOS, and Windows CI configuration
-- [x] Foundation hardening: inherited MSRV, bounded policy reads, redacted parser errors, fallible glob compilation, and lexical path normalization
-- [x] Cargo/npm dependency scanning and OSV integration, offline cache, and CycloneDX SBOM input
-- [x] Dependency-scan JSON output and regression tests
-- [x] Local JSONL security audit logging and audit command
-- [x] Offline doctor diagnostics and explicit capability reporting
-- [x] Audit/doctor JSON Schemas and contract, failure, and concurrency tests
-- [x] Local release-check gate, temporary installation smoke tests, and acceptance matrix
+- [x] Rust CLI, initialization, help, version, flags, and documented exit codes
+- [x] Strict version-1 policy parsing, deterministic evaluation, and path hardening
+- [x] Safe-Rust YAML migration with bounded inputs, nesting, aliases, and sanitized errors
+- [x] Cargo/npm OSV dependency scanning, offline cache, and CycloneDX SBOM input
+- [x] Secrets detection with location-only redacted evidence and bounded working-tree coverage
+- [x] JSONL audit logging, filters, concurrent appends, and malformed-record reporting
+- [x] Offline doctor diagnostics and accurate capability reporting
+- [x] Command/event JSON Schemas and positive/negative contract tests
+- [x] Synthetic acceptance fixtures, redaction tests, and failure-path regressions
+- [x] Four-target native CI, installation smoke tests, archive verification, and checksum corruption tests
+- [x] MIT license, legal-notice collection, release notes, and draft-release tooling
 
-## Remaining v0.0.1 work
+## Release gates
 
-- [ ] Secrets scanning and redacted findings
-- [ ] Secrets JSON contract and tests
-- [ ] Complete release acceptance: secrets detection, supported-platform CI evidence, dependency review, and release artifacts
+Implementation checkmarks describe available code, not a claim that a release has been published. For a release-ready draft, require the exact-commit four-target CI run and release-bundle artifact, fresh matching dependency-review evidence, and verified checksums. The pipeline generates `release-evidence.json` only after native validation and all archive checks succeed. See release-acceptance.md and the draft's evidence file for the actual run.
 
-Agent interception, approval workflows, and audit integrity verification belong to v0.0.2. This is not a complete v0.0.1 release.
+Agent interception, approvals, audit integrity verification, and reachability analysis remain v0.0.2 work.

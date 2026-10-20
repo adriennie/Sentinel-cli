@@ -44,9 +44,19 @@ fn valid_advisories(advisories: &[Advisory]) -> bool {
                     .all(|b| b.is_ascii_alphanumeric() || b"-_:.".contains(&b))
         })
 }
-fn advisory_kind(value: &Value) -> crate::AdvisoryKind {
-    let informational = value.pointer("/database_specific/informational");
-    if informational.is_some_and(|v| {
+fn advisory_kind(value: &Value, package: &Package) -> crate::AdvisoryKind {
+    let mut informational = vec![value.pointer("/database_specific/informational")];
+    if let Some(affected) = value.get("affected").and_then(Value::as_array) {
+        for entry in affected {
+            if entry.pointer("/package/name").and_then(Value::as_str) == Some(&package.name)
+                && entry.pointer("/package/ecosystem").and_then(Value::as_str)
+                    == Some(&package.ecosystem)
+            {
+                informational.push(entry.pointer("/database_specific/informational"));
+            }
+        }
+    }
+    if informational.into_iter().flatten().any(|v| {
         v.as_str() == Some("unmaintained")
             || v.as_array()
                 .is_some_and(|a| a.iter().any(|v| v.as_str() == Some("unmaintained")))
@@ -171,7 +181,7 @@ impl OsvClient for HttpOsv {
                         .and_then(Value::as_str)
                         .ok_or(ScanError("OSV advisory missing identifier"))?;
                     advisories.push(Advisory {
-                        kind: advisory_kind(vulnerability),
+                        kind: advisory_kind(vulnerability, package),
                         id: id.into(),
                         severity: severity(vulnerability, package),
                     });
@@ -383,6 +393,22 @@ mod tests {
             ],
             |client| assert!(client.query(&package()).is_err()),
         );
+    }
+    #[test]
+    fn explicit_maintenance_metadata_and_legacy_cache_classification() {
+        let value = json!({"affected":[{"package":{"name":"example","ecosystem":"npm"},"database_specific":{"informational":"unmaintained"}}]});
+        assert_eq!(
+            advisory_kind(&value, &package()),
+            crate::AdvisoryKind::Maintenance
+        );
+        assert_eq!(
+            advisory_kind(&json!({"summary":"unmaintained"}), &package()),
+            crate::AdvisoryKind::Unknown
+        );
+        let legacy: Advisory =
+            serde_json::from_value(json!({"id":"TEST-1","severity":"unknown"})).unwrap();
+        assert_eq!(legacy.kind, crate::AdvisoryKind::Unknown);
+        assert!(legacy.severity.exceeds(Severity::High));
     }
     #[test]
     fn cvss_vectors_are_scored_and_missing_severity_is_unknown() {

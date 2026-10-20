@@ -33,7 +33,7 @@ Doctor runs offline. It reports build and supported policy-schema versions, proj
 
 Storage checks create missing Sentinel storage directories and use temporary write/sync/delete probes. They do not edit the policy or dependency lockfiles. Doctor is itself audited when a project root is available and audit logging is enabled. Existing busy or oversized audit logs fail the storage checks.
 
-Checks use stable IDs and `pass`, `warn`, or `fail` states, with remediation text. Missing cache data, unsupported inputs, disabled scanning/logging, and malformed-but-readable audit history are warnings. Unresolvable roots and unsafe/unwritable storage are failures (exit 1); invalid/missing policy uses exit 3. Warnings alone exit 0. The current build explicitly warns that secrets scanning is missing. Lack of runtime agent integration is reported as an intentional release boundary, not as active protection.
+Checks use stable IDs and `pass`, `warn`, or `fail` states, with remediation text. Missing cache data, unsupported inputs, disabled scanning/logging, and malformed-but-readable audit history are warnings. Unresolvable roots and unsafe/unwritable storage are failures (exit 1); invalid/missing policy uses exit 3. Warnings alone exit 0. Doctor reports local secrets-scanner availability and warns when policy disables it. Lack of runtime agent integration is reported as an intentional release boundary, not as active protection.
 
 ## JSON contracts
 
@@ -45,4 +45,4 @@ Committed standalone JSON Schemas:
 - `schemas/audit-output.schema.json`
 - `schemas/doctor-output.schema.json`
 
-Integration tests validate actual outputs against these schemas, including RFC3339 formats, invalid-policy errors, malformed logs, storage failures, and missing project roots. Negative schema tests reject incomplete or inconsistent reports. JSON mode always emits one document on stdout; stderr holds diagnostics. Quiet mode preserves audit records and doctor check details while suppressing the summary.
+Integration tests validate actual outputs against these schemas, including RFC3339 formats, invalid-policy errors, malformed logs, storage failures, and missing project roots. Negative schema tests reject incomplete or inconsistent reports. The unified command-output schema also covers init, policy, scans, and argument errors. JSON mode always emits one document on stdout; stderr holds diagnostics. Quiet mode preserves audit records and doctor check details while suppressing the summary.

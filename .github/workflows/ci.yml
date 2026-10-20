@@ -1,18 +1,103 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   validation:
+    name: Validate ${{ matrix.target }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: macos-15
+            target: aarch64-apple-darwin
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '13.0'
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: '1.99.1'
           components: rustfmt, clippy
-      - run: cargo fmt --all -- --check
-      - run: cargo clippy --locked --workspace --all-targets -- -D warnings
-      - run: cargo test --locked --workspace
-      - run: cargo build --locked --workspace --release
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Verify dependency review
+        run: python scripts/verify-dependency-review.py
+      - name: Tests, contracts, release build and installed-binary acceptance
+        run: python scripts/check-release.py
+      - name: Verify native target
+        shell: python
+        run: |
+          import subprocess
+          info = subprocess.check_output(['rustc', '-vV'], text=True)
+          assert 'host: ${{ matrix.target }}' in info
+      - name: Package binary and legal notices
+        run: python scripts/package-release.py build --target ${{ matrix.target }}
+      - name: Verify archive and extracted binary
+        run: python scripts/package-release.py verify --smoke --expected-count 1 --expected-commit ${{ github.sha }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-${{ matrix.target }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          if-no-files-found: error
+          retention-days: 14
+  release-bundle:
+    name: Verify all release artifacts
+    needs: validation
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - run: python scripts/package-release.py checksums
+      - run: python scripts/package-release.py verify --expected-count 4 --expected-commit ${{ github.sha }}
+      - name: Record release evidence
+        shell: python
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          import hashlib, json, os
+          from pathlib import Path
+          evidence = {
+              'schema_version': 1, 'commit': os.environ['RELEASE_COMMIT'],
+              'workflow_url': os.environ['RELEASE_RUN_URL'], 'status': 'passed',
+              'targets': ['x86_64-unknown-linux-gnu', 'x86_64-pc-windows-msvc', 'x86_64-apple-darwin', 'aarch64-apple-darwin'],
+              'cargo_lock_sha256': hashlib.sha256(Path('Cargo.lock').read_bytes()).hexdigest(),
+              'checksums_sha256': hashlib.sha256(Path('dist/SHA256SUMS').read_bytes()).hexdigest(),
+          }
+          Path('dist/release-evidence.json').write_text(json.dumps(evidence, indent=2) + '\n')
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-bundle
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
