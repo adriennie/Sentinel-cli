@@ -1,3 +1,8 @@
+mod v002;
+pub use v002::{
+    agent, checkpoint_path, enriched_exit, parse_imports, sarif, v2, AnalysisOptions,
+    AnalysisReport,
+};
 mod doctor;
 pub use doctor::{doctor_at, CheckStatus, DoctorReport};
 // Project selection and configuration operations.
@@ -11,6 +16,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("{1}")]
+    Security(u8, &'static str),
     #[error("{0}")]
     Arguments(&'static str),
     #[error("{0}")]
@@ -25,6 +32,7 @@ pub enum Error {
 impl Error {
     pub fn exit_code(&self) -> i32 {
         match self {
+            Self::Security(code, _) => i32::from(*code),
             Self::Arguments(_) => 2,
             Self::Configuration(_) | Self::Policy(_) => 3,
             Self::Io(_) | Self::Audit(_) => 1,

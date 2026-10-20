@@ -13,3 +13,5 @@ tempfile.workspace = true
 sentinel-scanner = { path = "../sentinel-scanner" }
 sentinel-audit = { path = "../sentinel-audit" }
 serde.workspace = true
+sentinel-agent = { path = "../sentinel-agent" }
+serde_json.workspace = true

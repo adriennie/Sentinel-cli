@@ -91,6 +91,8 @@ pub struct Audit {
     pub redact_secrets: bool,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ActionContext {
     pub action_type: ActionType,
     pub target_paths: Vec<String>,
@@ -289,6 +291,29 @@ impl Policy {
             ),
         })
     }
+}
+
+/// Deterministic additive evidence, independent from permission precedence.
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RiskEvidence {
+    pub protected_path: bool,
+    pub destructive_operation: bool,
+    pub secret_access: bool,
+    pub reachable_dependency: bool,
+    pub known_exploitation: bool,
+    pub high_epss: bool,
+    pub uncertain: bool,
+}
+pub fn risk_score(e: &RiskEvidence) -> u8 {
+    (u8::from(e.protected_path) * 3
+        + u8::from(e.destructive_operation) * 4
+        + u8::from(e.secret_access) * 4
+        + u8::from(e.reachable_dependency) * 2
+        + u8::from(e.known_exploitation) * 3
+        + u8::from(e.high_epss) * 2
+        + u8::from(e.uncertain))
+    .min(10)
 }
 
 #[cfg(test)]

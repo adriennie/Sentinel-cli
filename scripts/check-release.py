@@ -60,6 +60,31 @@ def python_acceptance(binary, directory):
     assert json.loads(history.stdout)["data"]["complete"]
 
 
+def v002_acceptance(binary, directory):
+    project = Path(directory) / "v002-project"
+    project.mkdir()
+    run([str(binary), "init", "--project", str(project), "--quiet"])
+    (project / "Cargo.lock").write_text('version=4\n[[package]]\nname="local-fixture"\nversion="1.0.0"\n', encoding="utf-8")
+    for args in [["policy", "test"], ["redteam"], ["agent", "setup", "claude"], ["agent", "status"], ["approvals", "list"]]:
+        result = run([str(binary), *args, "--project", str(project), "--format=json"], capture_output=True, text=True)
+        data = json.loads(result.stdout)["data"]
+        assert data["schema_version"] == 2
+    result = subprocess.run([str(binary), "agent", "hook", "--project", str(project)], input="{}", capture_output=True, text=True)
+    assert result.returncode == 0
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    checkpoint = Path(directory) / "independent-checkpoint.json"
+    run([str(binary), "audit", "checkpoint", "--output", str(checkpoint), "--project", str(project), "--quiet"])
+    verified = run([str(binary), "audit", "verify", "--checkpoint", str(checkpoint), "--project", str(project), "--format=json"], capture_output=True, text=True)
+    assert json.loads(verified.stdout)["data"]["result"]["complete"]
+    result = run([str(binary), "scan", "--type", "dependencies", "--offline", "--reachability", "--exploit-aware", "--project", str(project), "--format=json"], capture_output=True, text=True)
+    assert json.loads(result.stdout)["data"]["command"] == "scan.enriched"
+    secret = "ghp_" + "B" * 36
+    (project / "synthetic.txt").write_text(secret, encoding="utf-8")
+    result = subprocess.run([str(binary), "scan", "--type", "secrets", "--project", str(project), "--format=sarif"], capture_output=True, text=True)
+    assert result.returncode == 4 and secret not in result.stdout + result.stderr
+    assert json.loads(result.stdout)["version"] == "2.1.0"
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--readiness-only", action="store_true", help="Inspect the existing release binary without rebuilding")
@@ -120,6 +145,7 @@ def main():
                 print("- " + blocker)
             return 1
         python_acceptance(binary, directory)
+        v002_acceptance(binary, directory)
         print("Local release checks passed. Confirm supported-platform CI and dependency-review results before tagging.")
         return 0
 

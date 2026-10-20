@@ -328,6 +328,7 @@ pub fn discover(root: &Path, sbom: Option<&Path>) -> Inventory {
     });
     let mut files = Vec::new();
     let mut requirement_files = Vec::new();
+    let mut python_manifests = Vec::new();
     let mut allowed_files = BTreeSet::new();
     let mut markers = BTreeSet::new();
     let mut supported = BTreeSet::new();
@@ -394,6 +395,16 @@ pub fn discover(root: &Path, sbom: Option<&Path>) -> Inventory {
             } else {
                 requirement_files.push(entry.path().to_path_buf());
             }
+        } else if name == "pyproject.toml" {
+            if kind.is_symlink() {
+                inventory.diagnostic_code(
+                    &relative,
+                    "python_manifest_unresolved",
+                    "Python manifest symlinks are not followed",
+                );
+            } else {
+                python_manifests.push(entry.path().to_path_buf());
+            }
         } else if matches!(name, "Cargo.toml" | "package.json") {
             markers.insert((
                 entry.path().parent().map(Path::to_path_buf),
@@ -406,7 +417,6 @@ pub fn discover(root: &Path, sbom: Option<&Path>) -> Inventory {
                 | "bun.lock"
                 | "bun.lockb"
                 | "Pipfile.lock"
-                | "pyproject.toml"
                 | "pom.xml"
                 | "build.gradle"
                 | "build.gradle.kts"
@@ -449,7 +459,7 @@ pub fn discover(root: &Path, sbom: Option<&Path>) -> Inventory {
         );
         files.truncate(256);
     }
-    if files.is_empty() && requirement_files.is_empty() {
+    if files.is_empty() && requirement_files.is_empty() && python_manifests.is_empty() {
         inventory.diagnostic(".", "No supported dependency lockfiles discovered; supply a CycloneDX JSON SBOM with --sbom");
     }
     requirement_files.sort();
@@ -460,6 +470,18 @@ pub fn discover(root: &Path, sbom: Option<&Path>) -> Inventory {
         256 - files.len(),
         &mut inventory,
     );
+    python_manifests.sort();
+    let python_locks = files
+        .iter()
+        .filter(|(_, _, k)| matches!(k, InputKind::Uv | InputKind::Poetry))
+        .filter_map(|(p, _, _)| p.parent().map(Path::to_path_buf))
+        .collect();
+    let python_projects = crate::python_projects::Projects::load(
+        root,
+        &python_manifests,
+        &python_locks,
+        &mut inventory,
+    );
     let mut npm_workspaces = BTreeSet::new();
     for (path, file, kind) in files {
         inventory.inputs.push(file.clone());
@@ -467,7 +489,13 @@ pub fn discover(root: &Path, sbom: Option<&Path>) -> Inventory {
             if matches!(kind, InputKind::Cargo) {
                 parse_cargo(&bytes, &file, &mut inventory)
             } else if matches!(kind, InputKind::Uv) {
-                crate::python::parse_uv(&bytes, &file, &mut inventory)
+                crate::python::parse_uv(
+                    &bytes,
+                    &file,
+                    &mut inventory,
+                    path.parent(),
+                    &python_projects,
+                )
             } else if matches!(kind, InputKind::Poetry) {
                 crate::python::parse_poetry(&bytes, &file, &mut inventory)
             } else {
@@ -495,6 +523,7 @@ pub fn discover(root: &Path, sbom: Option<&Path>) -> Inventory {
             inventory.diagnostic(&file, error.0);
         }
     }
+    python_projects.reconcile(root, &mut inventory);
     for (directory, ecosystem) in markers.difference(&supported) {
         // Cargo workspace members may share an ancestor Cargo.lock.
         let covered = (*ecosystem == "npm"

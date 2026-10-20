@@ -78,7 +78,11 @@ source = { registry = "https://pypi.org/simple" }
 fn manifest_reconciliation_is_not_silently_claimed() {
     let dir = TempDir::new().unwrap();
     fs::write(dir.path().join("uv.lock"), "version = 1\npackage = []").unwrap();
-    fs::write(dir.path().join("pyproject.toml"), "[project]\nname='demo'").unwrap();
+    fs::write(
+        dir.path().join("pyproject.toml"),
+        "[project]\nname='demo'\ndependencies=['missing>=1']",
+    )
+    .unwrap();
     let result = discover(dir.path(), None);
     assert!(!result.diagnostics.is_empty());
 }

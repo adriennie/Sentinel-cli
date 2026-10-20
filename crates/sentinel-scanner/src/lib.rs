@@ -1,7 +1,16 @@
 //! Dependency inventory, bounded OSV queries and timestamped local intelligence.
+mod analysis;
+mod sarif;
+pub use analysis::{
+    analyze, AnalysisFinding, AnalysisOptions, AnalysisReport, Epss, ExploitClient, HttpExploit,
+    Kev,
+};
+pub use sarif::sarif;
 mod inventory;
 mod osv;
 mod python;
+pub use python::normalize_python_name;
+mod python_projects;
 mod requirements;
 mod scan;
 mod secrets;

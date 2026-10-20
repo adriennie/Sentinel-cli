@@ -1,4 +1,6 @@
-//! Bounded, cooperatively locked local events. No integrity guarantees.
+mod integrity;
+pub use integrity::{Checkpoint, Verification};
+// Bounded, cooperatively locked local events; optional integrity sidecar.
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File, OpenOptions, TryLockError},
@@ -136,13 +138,7 @@ fn regular(path: &Path) -> Result<bool, AuditError> {
                     "Audit log must be a regular file; symlinks are rejected",
                 ));
             }
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::MetadataExt;
-                if metadata.nlink() != 1 {
-                    return Err(AuditError("Hard-linked audit logs are rejected"));
-                }
-            }
+            single_link(path)?;
             if metadata.len() > MAX_LOG_BYTES {
                 return Err(AuditError(
                     "Audit log exceeds 32 MiB; archive it before continuing",
@@ -248,6 +244,15 @@ impl Store {
         Ok(())
     }
     pub fn append(&self, events: &[Event]) -> Result<(), AuditError> {
+        self.append_inner(events, None)
+    }
+    pub fn append_attached(&self, events: &[Event], attachment: &str) -> Result<(), AuditError> {
+        if attachment.len() != 64 || !attachment.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err(AuditError("Invalid attachment hash"));
+        }
+        self.append_inner(events, Some(attachment))
+    }
+    fn append_inner(&self, events: &[Event], attachment: Option<&str>) -> Result<(), AuditError> {
         if events.len() > 16 {
             return Err(AuditError("Audit event batch exceeds size limit"));
         }
@@ -307,6 +312,7 @@ impl Store {
         }
         file.write_all(&bytes)
             .map_err(|_| AuditError("Unable to append audit events"))?;
+        integrity::update(&self.root, &mut file, false, attachment)?;
         // The batch is now whole. Do not hold the append lock across slow disk
         // flushes: concurrent writers must not starve behind another fsync.
         file.unlock()
@@ -369,6 +375,60 @@ impl Store {
             ..history
         })
     }
+}
+
+/// Sorted object keys, unchanged array order, compact UTF-8 JSON (no whitespace).
+pub fn canonical<T: Serialize>(value: &T) -> Result<Vec<u8>, AuditError> {
+    fn sorted(v: serde_json::Value) -> serde_json::Value {
+        match v {
+            serde_json::Value::Object(m) => {
+                let ordered: std::collections::BTreeMap<_, _> =
+                    m.into_iter().map(|(k, v)| (k, sorted(v))).collect();
+                serde_json::Value::Object(ordered.into_iter().collect())
+            }
+            serde_json::Value::Array(a) => {
+                serde_json::Value::Array(a.into_iter().map(sorted).collect())
+            }
+            v => v,
+        }
+    }
+    serde_json::to_vec(&sorted(
+        serde_json::to_value(value).map_err(|_| AuditError("Canonical serialization failed"))?,
+    ))
+    .map_err(|_| AuditError("Canonical serialization failed"))
+}
+
+/// Reject aliases before accessing sensitive state. Metadata checks are snapshots,
+/// not an atomic filesystem sandbox against concurrent same-user replacement.
+pub fn single_link(path: &Path) -> Result<(), AuditError> {
+    let metadata =
+        fs::symlink_metadata(path).map_err(|_| AuditError("Unable to inspect file identity"))?;
+    if !metadata.is_file() {
+        return Err(AuditError("Expected a regular non-symlink file"));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if metadata.nlink() != 1 {
+            return Err(AuditError("Hard-linked files are rejected"));
+        }
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        if metadata.file_attributes() & 0x400 != 0 {
+            return Err(AuditError("Windows reparse-point files are rejected"));
+        }
+        let file = File::open(path).map_err(|_| AuditError("Unable to open file identity"))?;
+        if winapi_util::file::information(&file)
+            .map_err(|_| AuditError("Unable to inspect Windows file links"))?
+            .number_of_links()
+            != 1
+        {
+            return Err(AuditError("Hard-linked files are rejected"));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

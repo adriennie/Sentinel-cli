@@ -87,6 +87,8 @@ pub(crate) fn parse_uv(
     input: &[u8],
     file: &str,
     inventory: &mut Inventory,
+    directory: Option<&std::path::Path>,
+    projects: &crate::python_projects::Projects,
 ) -> Result<(), ScanError> {
     if input.len() as u64 > MAX_INPUT_BYTES {
         return Err(ScanError("Python lockfile exceeds size limit"));
@@ -105,6 +107,16 @@ pub(crate) fn parse_uv(
                 Some("https://pypi.org/simple" | "https://pypi.org/simple/")
             );
         if !public {
+            if package.source.len() == 1
+                && package.source.iter().any(|(key, value)| {
+                    matches!(key.as_str(), "editable" | "virtual")
+                        && value.as_str().is_some_and(|s| {
+                            directory.is_some_and(|d| projects.local_member(d, s, &package.name))
+                        })
+                })
+            {
+                continue;
+            }
             inventory.diagnostic_code(
                 file,
                 "python_source_uncovered",
@@ -174,4 +186,14 @@ fn valid_name(name: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_' | b'.'))
         && name.as_bytes()[0].is_ascii_alphanumeric()
         && name.as_bytes()[name.len() - 1].is_ascii_alphanumeric()
+}
+
+pub fn normalize_python_name(value: &str) -> Result<String, ScanError> {
+    if value.len() > 256 {
+        return Err(ScanError("Python package name exceeds limit"));
+    }
+    value
+        .parse::<pep508_rs::PackageName>()
+        .map(|p| p.to_string())
+        .map_err(|_| ScanError("Invalid Python package name"))
 }

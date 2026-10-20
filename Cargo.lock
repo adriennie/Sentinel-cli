@@ -1484,20 +1484,38 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
 
 [[package]]
-name = "sentinel-audit"
-version = "0.0.1"
+name = "sentinel-agent"
+version = "0.0.2"
 dependencies = [
+ "globset",
+ "semver",
+ "sentinel-audit",
+ "sentinel-policy",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
- "thiserror 2.0.21",
- "time",
+ "unicode-normalization",
  "uuid",
 ]
 
 [[package]]
+name = "sentinel-audit"
+version = "0.0.2"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.21",
+ "time",
+ "uuid",
+ "winapi-util",
+]
+
+[[package]]
 name = "sentinel-cli"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "clap",
  "jsonschema",
@@ -1510,20 +1528,22 @@ dependencies = [
 
 [[package]]
 name = "sentinel-core"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
+ "sentinel-agent",
  "sentinel-audit",
  "sentinel-policy",
  "sentinel-scanner",
  "serde",
  "serde-saphyr",
+ "serde_json",
  "tempfile",
  "thiserror 2.0.21",
 ]
 
 [[package]]
 name = "sentinel-policy"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "globset",
  "serde",
@@ -1533,20 +1553,24 @@ dependencies = [
 
 [[package]]
 name = "sentinel-scanner"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "cvss",
+ "globset",
  "ignore",
  "packageurl",
  "pep508_rs",
  "regex",
  "reqwest",
  "semver",
+ "sentinel-audit",
+ "sentinel-policy",
  "serde",
  "serde_json",
  "sha2",
  "tempfile",
  "thiserror 2.0.21",
+ "time",
  "toml",
 ]
 
@@ -1981,6 +2005,15 @@ name = "unicode-ident"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
+
+[[package]]
+name = "unicode-normalization"
+version = "0.1.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75cd3fb03d5288b3ba9a1ee103ac7e9cbb59f0b03d64f8ddfcc04dd42758a85d"
+dependencies = [
+ "tinyvec",
+]
 
 [[package]]
 name = "unicode-width"

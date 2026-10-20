@@ -1,4 +1,4 @@
-# v0.0.1 release acceptance
+# Release acceptance (v0.0.2 extends v0.0.1)
 
 Run `python3 scripts/check-release.py` with the pinned Rust toolchain and Python 3 available. This checks formatting, Clippy, all Rust tests and command contracts, packaging negative tests, locked release compilation, temporary CLI installation, and installed-binary initialization, policies, scans, actual synthetic-secret detection/redaction, doctor, and audit history. Required test fixtures use no live vulnerability APIs. `--readiness-only` checks an existing binary; `--readiness-only --binary PATH` checks an extracted archive binary.
 
@@ -27,3 +27,11 @@ The YAML migration removes serde_yaml_ng and unsafe-libyaml rather than ignoring
 The CI `release-bundle` artifact contains the four archives, SHA256SUMS and release-evidence.json. A draft release is created only from a successful exact-commit run and those verified assets. An existing conflicting tag or release must never be overwritten. The draft remains unpublished. Local success alone does not satisfy CI-001 or establish that a draft release exists.
 
 Supported targets: x86_64-unknown-linux-gnu, x86_64-pc-windows-msvc, x86_64-apple-darwin, and aarch64-apple-darwin. Binaries are unsigned and not notarized; checksums are not independent signatures. Agent enforcement, reachability, audit integrity and universal language/project coverage are not provided.
+
+## v0.0.2 additions
+
+Require Python manifest/workspace tests; AGT-001–007 supported hook installation, allowed/denied/protected writes, self-protection, traversal/symlink/case/Unicode/hard-link tests; APR-001–003 exact retry, modified file/arguments, expiry and concurrent single consumption; RISK-001/002 scoped import evidence and unknown unsupported analysis; AUD-002/003 record/journal modification and independent-checkpoint truncation; policy fixture/PR rejection, isolated RED-001 and measured PERF-001. Version-2 JSON and official OASIS SARIF schemas are validated with positive/negative fixtures.
+
+Installed and extracted binaries must exercise policy tests, redteam, setup/status, malformed-hook denial, checkpoints/verification, optional offline analysis and redacted SARIF. Every native job runs `scripts/test-claude-provider.py --sentinel PATH --install-client`: official Claude 2.1.304, scripts disabled during its temporary install, synthetic localhost model API, allowed edit, protected edit denied, and exact-action approval consumed. This is actual provider/tool execution, not a claimed OS sandbox or a live paid API test. Release evidence records the pinned client version and exact commit.
+
+The existing 24-hour, exact-Cargo.lock dependency-review gate remains required. All four archives, legal notices, BUILD.json, SHA256SUMS and the aggregate evidence must verify before preparing an unpublished v0.0.2 draft. Existing v0.0.1 draft assets are retained.

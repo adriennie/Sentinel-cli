@@ -12,13 +12,13 @@ Dependency scanning inspects resolved package identities. It does not run packag
 
 ## Coverage
 
-### Unreleased v0.0.2 work
+### v0.0.2 Python discovery
 
 The development source now discovers `uv.lock` version 1, with absent revision or revisions 0–5, and extracts exact public-PyPI registry identities. Names are normalized for PyPI lookup and Python release/prerelease/post/dev/local version spellings are accepted without Rust SemVer conversion. Unrecognized version spellings remain explicitly uncovered. Discovery reuses the existing OSV client, cache, limits, deduplication and result contracts. It never invokes Python or a package manager.
 
 Private registries, Git, URL, editable and local sources remain uncovered, as do unsupported schema revisions. Poetry lockfile versions 1.1, 2.0, and 2.1 are also discovered automatically. Packages without source metadata use Poetry’s default PyPI source; explicit public-PyPI legacy sources are accepted, and other source types remain uncovered. All listed groups and platform alternatives are inventoried. Coexisting uv/Poetry locks retain known packages and locations but report ambiguous authority.
 
-Manifest reconciliation and workspace ownership are still pending; `pyproject.toml` therefore continues to produce an incomplete-coverage diagnostic even alongside a parsed uv lockfile. Completeness is relative to the inventory, not proof of lockfile freshness or installed-environment equivalence. The published v0.0.1 draft binaries do not contain these changes.
+`pyproject.toml` declarations and supported groups are reconciled against same-directory locks or explicitly declared uv workspace ownership. Local uv virtual/editable entries are excluded from public lookup only when their manifest and ownership match. Unrelated nested projects do not inherit a parent lock. Manifest-only exact public pins can be queried with incomplete transitive coverage; dynamic dependencies, unsupported constraints, cyclic groups, source overrides and incompatible/missing locked identities remain explicit gaps. Manifest limits are 1 MiB each, 16 MiB total, 256 files and 10,000 declarations per manifest; workspace patterns are precompiled and bounded. Numeric Poetry caret/tilde ranges with up to three release segments are supported; unsupported producer-specific syntax remains unresolved. Completeness is relative to the inventory, not proof of lockfile freshness or installed-environment equivalence. These additions do not change existing v0.0.1 draft binaries. See v0.0.2-security.md for optional analysis and gate limits.
 
 The parser follows the producer's [versioned lockfile description](https://docs.astral.sh/uv/concepts/resolution/) and [representative lockfile](https://github.com/astral-sh/uv/blob/main/uv.lock). uv warns that its lockfile is not a stable public format, so schema gates and compatibility fixtures must be maintained. Poetry source/default-index and schema handling follow its [lockfile reader](https://github.com/python-poetry/poetry/blob/main/src/poetry/packages/locker.py).
 

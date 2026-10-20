@@ -1,25 +1,24 @@
-# Sentinel v0.0.1
+# Sentinel v0.0.2
 
-Initial local-first security CLI release candidate, prepared as an unpublished draft.
+Scoped agent protection and automatic Python dependency discovery, prepared as an unpublished draft.
 
-- Atomic `sentinel init`, strict version-1 policies and deterministic L0–L3 evaluation.
-- `sentinel scan` runs enabled dependency and secrets checks, with selectable scan types, severity thresholds, explicit incomplete results and JSON output.
-- Native Cargo/npm OSV scanning plus documented CycloneDX input, timestamped offline intelligence, and explicit advisory classification.
-- Local common-credential patterns with redacted location evidence, bounded reads and documented exclusions.
-- Concurrent local JSONL auditing and offline `doctor` diagnostics.
-- Versioned JSON Schemas, synthetic acceptance tests, four-target native checks and verified archive smoke tests.
-- Safe-Rust YAML parsing replaces the unmaintained unsafe-libyaml dependency.
+- Native uv/Poetry lockfiles, pinned requirements includes/constraints, Python manifest reconciliation and explicit uv workspace ownership. Unsupported/private/unresolved inputs remain visible.
+- Opt-in Claude Code pre-action gate with restricted launch, self-protection and exact-action local approvals. Requires Claude 2.1.304+ within major version 2; hooks are not an OS sandbox.
+- Conservative Python import reachability prototype and timestamped EPSS/CISA KEV enrichment; unsupported, stale and unavailable evidence remains unknown/incomplete.
+- SHA-256 audit integrity sidecar and attached decision journal; independently retained checkpoints detect truncation below a saved prefix. Checkpoints are not automatically authenticated or protected against same-user rewrites.
+- Deterministic policy fixtures, base-policy proposed-change PR gate, isolated synthetic redteam, measured risk/policy tests and redacted SARIF 2.1.0.
+- Existing version-1 policies, audit events and old command results remain compatible. New feature data uses version 2 inside the existing envelope; hooks and SARIF use their native protocols.
 
-## Download and verify
+## Install and verify
 
-Choose the archive matching your OS/CPU: Linux x64, Windows x64, macOS Intel, or macOS Apple Silicon. Compare its SHA-256 digest with SHA256SUMS, then extract and place the binary on PATH. Installation instructions, the MIT license, third-party legal notices and build provenance are inside each archive. Exact source and CI evidence are recorded in release-evidence.json.
+Choose Linux x64, Windows x64, Intel Mac or Apple Silicon. Verify the selected archive against SHA256SUMS before extraction. Each archive includes the binary, MIT license, upstream legal notices, installation instructions, changelog and BUILD.json. Exact source and native CI results are in release-evidence.json. See INSTALL.md and docs/v0.0.2-security.md in the source for operating limits.
 
-## Compatibility and limits
+## Validation and limits
 
-Policy schema version remains 1. Unqualified scans now run both enabled scanners; use `--type dependencies` for the earlier dependency-only behavior. Unknown advisory severity still conservatively triggers the configured failure threshold. Maintenance and unclassified advisories remain visible.
+All release gates must pass on the exact implementation commit: formatting, Clippy, tests/contracts, release builds, installed/extracted-binary acceptance, four native targets, legal notices and combined checksum/provenance verification. Each native target tests the real pinned Claude client against a synthetic localhost Messages API; no paid model calls are required. Dependency review must cover the current lockfile and remain within 24 hours.
 
-Exit 4 means threshold findings; exit 7 means incomplete scanning and takes precedence over findings. An `ok` JSON envelope means command execution completed: inspect scan completeness, doctor check status, audit logging status and the process exit code. Logs have no tamper-evidence or authentication guarantee.
+No universal language coverage, full call-graph/function reachability, arbitrary shell inspection, managed-process containment or tamper-proof same-user storage is claimed. Git/private registries and unsupported lock schemas remain uncovered. Requirements files do not establish transitive closure. Secrets scanning retains its 1 MiB text-file limit and documented patterns/exclusions. Unknown severity and incomplete coverage keep conservative exit behavior. No Codex/MCP agent adapter, hosted dashboard or OS sandbox is included.
 
-Patterns and supported dependency ecosystems are limited; ignored/build/vendor files, symlinks, binary inputs, Git history, arbitrary credentials and unsupported dependency formats are outside the documented coverage. `--include-ignored` expands secret-file coverage but retains hard exclusions. No provider validation, agent interception, sandboxing, reachability analysis or complete security guarantee is provided.
+Exit codes: 0 executed/success within scope; 1 unexpected/storage/provider failure; 2 arguments; 3 configuration; 4 threshold findings; 5 policy-test/proposed-change denial; 6 unavailable approval; 7 incomplete scan/requested analysis; 8 audit verification failure. An `ok` envelope is not a security clearance.
 
-Binaries are unsigned and not notarized. See the bundled instructions for OS/runtime minimums and source installation. This release is a draft and is not automatically published.
+This draft is not public publication. The v0.0.1 draft is retained separately.

@@ -177,6 +177,10 @@ pub fn doctor_at(root: &Path, config: &Path) -> DoctorReport {
         } else {
             let categories = [
                 ("python_lock_conflict", "conflicting Python lockfiles"),
+                (
+                    "python_manifest_unresolved",
+                    "unresolved Python manifest or workspace",
+                ),
                 ("python_version_unresolved", "unresolved Python versions"),
                 (
                     "python_constraint_conflict",
@@ -248,11 +252,18 @@ pub fn doctor_at(root: &Path, config: &Path) -> DoctorReport {
         "Local pattern-based secrets scanning is available",
         "Use sentinel scan --type secrets; ignored files require --include-ignored",
     );
-    report.add(
-        "integrations",
-        CheckStatus::Pass,
-        "This release has no runtime agent integration or enforcement",
-        "None",
-    );
+    if project
+        .root
+        .join(".sentinel/agent/installation.json")
+        .symlink_metadata()
+        .is_ok()
+    {
+        match sentinel_agent::status(&project.root,&project.config){
+            Ok(health) if health.healthy=>{report.capabilities.agent_enforcement=true;report.add("integrations",CheckStatus::Pass,"Claude hook installation verified; enforcement applies only inside a verified sentinel guard session", "Use sentinel agent status for coverage; hooks are not an OS sandbox");}
+            _=>report.add("integrations",CheckStatus::Fail,"Claude hook installation is missing, changed, or unsafe","Reconcile settings and reinstall the verified gate before starting a guarded session"),
+        }
+    } else {
+        report.add("integrations",CheckStatus::Pass,"No active agent gate is claimed; Claude integration is available through explicit setup and guard","Use sentinel agent setup claude, inspect coverage, then sentinel guard -- claude");
+    }
     report.finish()
 }

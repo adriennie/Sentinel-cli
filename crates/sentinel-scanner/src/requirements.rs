@@ -25,7 +25,7 @@ struct Node {
     unsafe_source: bool,
 }
 #[derive(Default)]
-struct Warnings(bool);
+pub(crate) struct Warnings(pub(crate) bool);
 impl Reporter for Warnings {
     fn report(&mut self, _: MarkerWarningKind, _: String) {
         self.0 = true;

@@ -1,3 +1,7 @@
+# Version scope
+
+The sections below describe the compatible version-1 command log. v0.0.2 adds optional integrity chains, an attached agent decision journal, checkpoints, and guarded Claude diagnostics; see [the security guide](v0.0.2-security.md).
+
 # Local auditing and doctor diagnostics
 
 ## Audit history

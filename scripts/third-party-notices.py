@@ -25,7 +25,7 @@ def main():
         for dependency in nodes[identity]["deps"]:
             if any(kind["kind"] != "dev" for kind in dependency["dep_kinds"]):
                 pending.append(dependency["pkg"])
-    blocks = ["Sentinel v0.0.1 third-party notices\n\nRegistry packages reachable through non-development CLI dependencies, including target-specific dependencies. Each package retains its upstream licensing terms. License declarations below do not relicense dependencies under Sentinel's MIT license.\n"]
+    blocks = ["Sentinel third-party notices\n\nRegistry packages reachable through non-development CLI dependencies, including target-specific dependencies. Each package retains its upstream licensing terms. License declarations below do not relicense dependencies under Sentinel's MIT license.\n"]
     missing = []
     for package in sorted((packages[key] for key in included if packages[key]["source"]), key=lambda p: (p["name"], p["version"])):
         root = Path(package["manifest_path"]).parent
