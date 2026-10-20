@@ -4,25 +4,26 @@ set -euo pipefail
 umask 077
 
 main() {
-    local repository=adriennie/Sentinel-cli version=latest github=false force=false
+    local repository=adriennie/sentinel-releases version=latest github=false force=false
     local install_dir=${SENTINEL_INSTALL_DIR:-${HOME:?HOME must be set}/.local/bin}
     while [ "$#" -gt 0 ]; do
         case "$1" in
-            --version|--install-dir)
+            --version|--install-dir|--repository)
                 [ "$#" -ge 2 ] || die "$1 requires a value"
-                if [ "$1" = --version ]; then version=$2; else install_dir=$2; fi
+                case "$1" in --version) version=$2 ;; --install-dir) install_dir=$2 ;; --repository) repository=$2 ;; esac
                 shift 2 ;;
             --github) github=true; shift ;;
             --force) force=true; shift ;;
             -h|--help)
                 printf '%s\n' 'Install Sentinel from a published GitHub release.' \
-                    'Usage: bash install.sh [--version VERSION] [--install-dir DIR] [--force] [--github]' \
+                    'Usage: bash install.sh [--version VERSION] [--install-dir DIR] [--force] [--github] [--repository OWNER/REPO]' \
                     'Default: latest published release into ~/.local/bin; no sudo or shell-profile changes.' \
                     '--github uses an already authenticated GitHub CLI for private repositories.'
                 return ;;
             *) die "Unknown installer option: $1" ;;
         esac
     done
+    [[ "$repository" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || die 'Repository must have the form OWNER/REPO'
     local tool os arch target libc major minor
     for tool in uname mktemp tar awk chmod mv wc head tr; do
         command -v "$tool" >/dev/null 2>&1 || die "Required tool is missing: $tool"

@@ -32,12 +32,12 @@ class InstallerTests(unittest.TestCase):
         self.tool('getconf', '#!/bin/sh\nprintf "%s\\n" "$FIXTURE_LIBC"\n')
         self.tool('curl', '#!' + sys.executable + '\n' + '''import os, pathlib, shutil, sys
 args=sys.argv[1:]; url=args[-1]
-assert url.startswith('https://github.com/adriennie/Sentinel-cli/')
+assert url.startswith('https://github.com/'+os.environ.get('EXPECTED_REPOSITORY','adriennie/sentinel-releases')+'/')
 assert args[args.index('--proto')+1]=='=https' and args[args.index('--proto-redir')+1]=='=https'
 with open(os.environ['REQUESTS'],'a') as log: log.write(url+'\\n')
 if os.environ.get('FAIL_DOWNLOAD'): sys.exit(22)
 if url.endswith('/latest'):
- print('https://github.com/adriennie/Sentinel-cli/releases/tag/v0.0.2',end='')
+ print('https://github.com/'+os.environ.get('EXPECTED_REPOSITORY','adriennie/sentinel-releases')+'/releases/tag/v0.0.2',end='')
 else:
  shutil.copyfile(pathlib.Path(os.environ['FIXTURES']) / url.rsplit('/',1)[-1],args[args.index('--output')+1])
 ''')
@@ -172,3 +172,9 @@ else: sys.exit(2)
         self.assertEqual(result.returncode, 0)
         self.assertIn('no sudo', result.stdout)
         self.assertFalse((self.root / 'requests').exists())
+
+    def test_repository_override_is_validated_and_used(self):
+        self.env['EXPECTED_REPOSITORY'] = 'adriennie/Sentinel-cli'
+        result = self.run_install('--version', '0.0.2', '--repository', 'adriennie/Sentinel-cli')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotEqual(self.run_install('--repository', '../../outside').returncode, 0)

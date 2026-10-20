@@ -71,4 +71,4 @@ CI is configured to run these checks on Linux, macOS, and Windows. Run `python3 
 
 ### One-command installer
 
-The tested Bash installer is in [install.sh](install.sh); see [installation instructions](INSTALL.md). Public `curl | bash` hosting requires approved public installer/release distribution. Until then, use `bash install.sh --github` with authenticated GitHub CLI access to a published release. No sudo or profile edits are performed.
+The tested Bash installer is in [install.sh](install.sh); see [installation instructions](INSTALL.md). Public `curl | bash` hosting requires approved public installer/release distribution. Until then, use `bash install.sh --repository adriennie/Sentinel-cli --github` with authenticated GitHub CLI access to a published release. No sudo or profile edits are performed.

@@ -7,16 +7,18 @@ From a local checkout:
 ```sh
 bash install.sh --help
 # Requires an already authenticated GitHub CLI for this private repository:
-bash install.sh --github
+bash install.sh --repository adriennie/Sentinel-cli --github
 # Select a published version, or explicitly replace a previous installation:
-bash install.sh --github --version 0.0.1 --force
+bash install.sh --repository adriennie/Sentinel-cli --github --version 0.0.1 --force
 ```
 
 `latest` means the latest **published** release; it currently does not include the v0.0.2 draft. Explicit private draft downloads are refused. Once a public installer endpoint and published release assets are approved, the public command has this form:
 
 ```text
-curl -fsSL <PUBLIC_INSTALLER_HTTPS_URL> | bash
+curl -fsSL https://raw.githubusercontent.com/adriennie/sentinel-releases/main/install.sh | bash
 ```
+
+The proposed public download repository is `adriennie/sentinel-releases`; it is not deployed yet. The main source repository can remain private. Override the release repository with `--repository OWNER/REPO`.
 
 The default destination is `~/.local/bin`. Override it with `--install-dir /absolute/path` or `SENTINEL_INSTALL_DIR`. To pass installer options through a pipe, use `bash -s -- --version 0.0.2`. Existing binaries are preserved unless `--force` is supplied; symlink destinations are rejected. The installer downloads only over HTTPS, checks the selected archive against `SHA256SUMS`, extracts only the single expected regular binary, verifies its version, and replaces it atomically. It leaves shell profiles unchanged and prints the PATH command when needed. Checksums detect corrupted downloads; they are not independent signatures against a compromised release publisher. As with any `curl | bash` installation, trust the source of the installer itself, or download and inspect it first.
 
