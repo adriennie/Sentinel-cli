@@ -21,4 +21,4 @@ No universal language coverage, full call-graph/function reachability, arbitrary
 
 Exit codes: 0 executed/success within scope; 1 unexpected/storage/provider failure; 2 arguments; 3 configuration; 4 threshold findings; 5 policy-test/proposed-change denial; 6 unavailable approval; 7 incomplete scan/requested analysis; 8 audit verification failure. An `ok` envelope is not a security clearance.
 
-This draft is not public publication. The v0.0.1 draft is retained separately.
+This draft is not public publication. The v0.0.1 release is retained separately.

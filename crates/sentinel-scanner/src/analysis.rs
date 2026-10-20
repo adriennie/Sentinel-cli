@@ -328,6 +328,12 @@ pub fn analyze(
                     result
                         .diagnostics
                         .push("Exploit intelligence query budget exhausted");
+                    record.risk_score =
+                        sentinel_policy::risk_score(&sentinel_policy::RiskEvidence {
+                            reachable_dependency: record.reachability == "reachable",
+                            uncertain: true,
+                            ..Default::default()
+                        });
                     result.findings.push(record);
                     continue;
                 }

@@ -177,22 +177,49 @@ fn setup_preserves_settings_and_detects_tampering() {
     fs::write(&path, serde_json::to_vec(&state).unwrap()).unwrap();
     assert!(status(root.path(), &config).is_err());
 }
-#[cfg(unix)]
 #[test]
-fn symlink_and_case_bypasses_are_denied() {
+fn symlink_hardlink_and_case_bypasses_are_denied() {
     let (root, policy, s) = fixture(Level::L0);
     let out = tempfile::Builder::new()
         .tempdir_in(std::env::temp_dir().canonicalize().unwrap())
         .unwrap();
-    std::os::unix::fs::symlink(out.path(), root.path().join("link")).unwrap();
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(out.path(), root.path().join("link")).unwrap();
+        assert!(gate(
+            root.path(),
+            &root.path().join("sentinel.yml"),
+            &policy,
+            &input(root.path(), "link/file", "Write"),
+            &s.nonce
+        )
+        .is_err());
+    }
+    fs::write(out.path().join("original.txt"), "synthetic private target").unwrap();
+    fs::hard_link(
+        out.path().join("original.txt"),
+        root.path().join("linked.txt"),
+    )
+    .unwrap();
     assert!(gate(
         root.path(),
         &root.path().join("sentinel.yml"),
         &policy,
-        &input(root.path(), "link/file", "Write"),
+        &input(root.path(), "linked.txt", "Write"),
         &s.nonce
     )
     .is_err());
+    #[cfg(windows)]
+    for path in ["NUL", "CON.txt", "src/COM1", "src/LPT9.log"] {
+        assert!(gate(
+            root.path(),
+            &root.path().join("sentinel.yml"),
+            &policy,
+            &input(root.path(), path, "Write"),
+            &s.nonce
+        )
+        .is_err());
+    }
     assert_eq!(
         gate(
             root.path(),
