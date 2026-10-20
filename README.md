@@ -68,3 +68,7 @@ cargo build --locked --workspace --release
 ```
 
 CI is configured to run these checks on Linux, macOS, and Windows. Run `python3 scripts/check-release.py` for local release checks and a temporary installation smoke test; it checks actual synthetic-secret detection and redaction before reporting local readiness. See [release acceptance](docs/release-acceptance.md). Prebuilt release archives include licensing notices and installation instructions; see [INSTALL.md](INSTALL.md). See [the development checklist](docs/development-checklist.md) for milestone status. The four native jobs additionally test a pinned real Claude client against a synthetic localhost API; no paid model calls or live vulnerability APIs are required in acceptance fixtures. Original design documents and diagrams are retained.
+
+### One-command installer
+
+The tested Bash installer is in [install.sh](install.sh); see [installation instructions](INSTALL.md). Public `curl | bash` hosting requires approved public installer/release distribution. Until then, use `bash install.sh --github` with authenticated GitHub CLI access to a published release. No sudo or profile edits are performed.

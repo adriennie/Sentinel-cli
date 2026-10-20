@@ -1,5 +1,27 @@
 # Install Sentinel 0.0.2
 
+The repository now includes `install.sh` for one-command installation on supported macOS and GNU/Linux systems. The installer is implemented; an anonymous public download endpoint has **not** been deployed. This repository is private, and v0.0.2 is still an unpublished draft. Do not treat a prospective public URL as live.
+
+From a local checkout:
+
+```sh
+bash install.sh --help
+# Requires an already authenticated GitHub CLI for this private repository:
+bash install.sh --github
+# Select a published version, or explicitly replace a previous installation:
+bash install.sh --github --version 0.0.1 --force
+```
+
+`latest` means the latest **published** release; it currently does not include the v0.0.2 draft. Explicit private draft downloads are refused. Once a public installer endpoint and published release assets are approved, the public command has this form:
+
+```text
+curl -fsSL <PUBLIC_INSTALLER_HTTPS_URL> | bash
+```
+
+The default destination is `~/.local/bin`. Override it with `--install-dir /absolute/path` or `SENTINEL_INSTALL_DIR`. To pass installer options through a pipe, use `bash -s -- --version 0.0.2`. Existing binaries are preserved unless `--force` is supplied; symlink destinations are rejected. The installer downloads only over HTTPS, checks the selected archive against `SHA256SUMS`, extracts only the single expected regular binary, verifies its version, and replaces it atomically. It leaves shell profiles unchanged and prints the PATH command when needed. Checksums detect corrupted downloads; they are not independent signatures against a compromised release publisher. As with any `curl | bash` installation, trust the source of the installer itself, or download and inspect it first.
+
+Native Windows users should use the ZIP installation below; there is no PowerShell installer in this change. GNU/Linux ARM64 and musl builds are not currently published.
+
 Select the archive matching your operating system and CPU. Linux binaries target x86_64 GNU/Linux (glibc 2.39 or newer); Windows binaries target x86_64 MSVC; macOS binaries target either Intel x86_64 (macOS 13+) or Apple Silicon aarch64 (macOS 13+).
 
 Verify the archive against SHA256SUMS before extraction. On Linux use `sha256sum -c SHA256SUMS`; on macOS use `shasum -a 256 -c SHA256SUMS`. On Windows compare `(Get-FileHash <archive> -Algorithm SHA256).Hash` with its entry in SHA256SUMS. Only compare entries for downloaded files.
