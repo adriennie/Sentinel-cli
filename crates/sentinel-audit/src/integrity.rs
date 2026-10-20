@@ -107,6 +107,38 @@ fn serialize(values: &[Link]) -> Result<Vec<u8>, AuditError> {
     }
     Ok(bytes)
 }
+/// Validate the complete old snapshot before mutating either file. Caller holds
+/// the exclusive command-log lock; legacy projects without a chain stay v1.
+pub(super) fn before_append(
+    root: &Path,
+    file: &mut File,
+    required: bool,
+) -> Result<(), AuditError> {
+    let path = root.join(".sentinel/audit-chain-v2.jsonl");
+    if !regular(&path)? {
+        return if required {
+            Err(AuditError(
+                "Attached events require integrity initialization",
+            ))
+        } else {
+            Ok(())
+        };
+    }
+    file.seek(SeekFrom::Start(0))
+        .map_err(|_| AuditError("Unable to inspect audit snapshot"))?;
+    let mut bytes = Vec::new();
+    file.take(MAX_LOG_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| AuditError("Unable to read audit snapshot"))?;
+    let stored = recorded(&read(&path)?)?;
+    let attachments: Vec<_> = stored.iter().map(|l| l.attachment.clone()).collect();
+    if links(&bytes, &attachments)? != stored {
+        return Err(AuditError(
+            "Existing integrity evidence is inconsistent; refusing append or repair",
+        ));
+    }
+    Ok(())
+}
 /// Caller holds the exclusive v1 log lock. Prefixes are verified, never repaired.
 pub(super) fn update(
     root: &Path,
@@ -313,5 +345,27 @@ mod tests {
         fs::write(t.path().join(".sentinel/audit-chain-v2.jsonl"), b"").unwrap();
         assert!(s.verify(None).is_ok());
         assert!(s.verify(Some(&cp)).is_err());
+    }
+    #[test]
+    fn interrupted_chain_is_never_repaired_by_a_later_append() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::new(root.path());
+        store
+            .append(&command_events(Command::Init, 0, None, None).unwrap())
+            .unwrap();
+        store.enable_integrity().unwrap();
+        let log = root.path().join(".sentinel/audit.jsonl");
+        let chain = root.path().join(".sentinel/audit-chain-v2.jsonl");
+        let chain_before = fs::read(&chain).unwrap();
+        let event = command_events(Command::Doctor, 0, None, None).unwrap();
+        let mut bytes = fs::read(&log).unwrap();
+        bytes.extend(serde_json::to_vec(&event[0]).unwrap());
+        bytes.push(b'\n');
+        fs::write(&log, &bytes).unwrap();
+        assert!(store.append(&event).is_err());
+        assert!(store.enable_integrity().is_err());
+        assert!(store.verify(None).is_err());
+        assert_eq!(fs::read(&log).unwrap(), bytes);
+        assert_eq!(fs::read(&chain).unwrap(), chain_before);
     }
 }

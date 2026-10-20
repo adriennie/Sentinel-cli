@@ -247,6 +247,9 @@ impl Store {
         self.append_inner(events, None)
     }
     pub fn append_attached(&self, events: &[Event], attachment: &str) -> Result<(), AuditError> {
+        if events.len() != 1 {
+            return Err(AuditError("An attachment requires exactly one audit event"));
+        }
         if attachment.len() != 64 || !attachment.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err(AuditError("Invalid attachment hash"));
         }
@@ -299,6 +302,7 @@ impl Store {
                 "Audit log size limit reached; archive it before continuing",
             ));
         }
+        integrity::before_append(&self.root, &mut file, attachment.is_some())?;
         if size > 0 {
             file.seek(SeekFrom::End(-1))
                 .map_err(|_| AuditError("Unable to inspect audit log tail"))?;
