@@ -38,6 +38,7 @@ struct Cli {
 enum Format {
     Text,
     Json,
+    Sarif,
 }
 #[derive(Clone, Copy, ValueEnum)]
 enum SecurityLevel {
@@ -80,20 +81,95 @@ enum Command {
         /// Use CycloneDX JSON 1.4–1.7 instead of discovering lockfiles.
         #[arg(long)]
         sbom: Option<PathBuf>,
+        /// Conservative Python import reachability prototype.
+        #[arg(long)]
+        reachability: bool,
+        /// Add timestamped EPSS and CISA KEV intelligence.
+        #[arg(long)]
+        exploit_aware: bool,
+        #[arg(long, requires = "reachability")]
+        entrypoint: Vec<PathBuf>,
+        /// Explicit distribution=module mapping for Python reachability.
+        #[arg(long, requires = "reachability")]
+        python_import: Vec<String>,
     },
     /// Diagnose configuration, storage, cache and supported capabilities offline.
     Doctor,
-    /// Read local redacted audit history (no integrity guarantee).
+    /// Read redacted history or verify explicitly enabled integrity evidence.
     Audit {
+        #[command(subcommand)]
+        command: Option<AuditSubcommand>,
         #[arg(long, default_value_t = 50, value_parser = clap::value_parser!(u32).range(1..=10000))]
         limit: u32,
         #[arg(long, value_parser = parse_event)]
         event: Option<AuditEventType>,
     },
+    /// Install and inspect the supported Claude Code policy gate.
+    Agent {
+        #[command(subcommand)]
+        command: AgentCommand,
+    },
+    /// Launch a provider; Codex/Copilot previews require explicit degraded-hook opt-in.
+    Guard {
+        #[arg(long, value_parser=["claude","codex","copilot"])]
+        provider: Option<String>,
+        #[arg(long)]
+        allow_degraded_hooks: bool,
+        #[arg(long)]
+        scope: Vec<String>,
+        #[arg(last = true, default_value = "claude")]
+        program: Vec<String>,
+    },
+    /// Inspect or grant exact-action, expiring approvals.
+    Approvals {
+        #[command(subcommand)]
+        command: ApprovalCommand,
+    },
+    /// Run isolated synthetic policy-bypass fixtures without executing attacks.
+    Redteam,
     /// Inspect project security policy.
     Policy {
         #[command(subcommand)]
         command: PolicyCommand,
+    },
+}
+#[derive(Subcommand)]
+enum AuditSubcommand {
+    /// Verify the v2 hash-chain sidecar; an independent checkpoint detects truncation.
+    Verify {
+        #[arg(long)]
+        checkpoint: Option<PathBuf>,
+    },
+    /// Enable integrity and write a non-overwriting checkpoint outside the project.
+    Checkpoint {
+        #[arg(long)]
+        output: PathBuf,
+    },
+}
+#[derive(Subcommand)]
+enum AgentCommand {
+    Setup {
+        #[arg(value_parser=["claude","codex","copilot"])]
+        provider: String,
+    },
+    Status {
+        #[arg(long, default_value="claude", value_parser=["claude","codex","copilot"])]
+        provider: String,
+    },
+    #[command(hide = true)]
+    Hook {
+        #[arg(long, default_value="claude", value_parser=["claude","codex","copilot"])]
+        provider: String,
+    },
+}
+#[derive(Subcommand)]
+enum ApprovalCommand {
+    List,
+    /// Explicitly approve the original binding; changed or expired actions are rejected.
+    Grant {
+        id: String,
+        #[arg(long)]
+        binding: String,
     },
 }
 #[derive(Clone, Copy, ValueEnum)]
@@ -112,8 +188,26 @@ fn parse_severity(value: &str) -> Result<Severity, String> {
 enum PolicyCommand {
     /// Validate policy syntax, fields, rules, and path patterns.
     Check,
+    /// Run built-in conformance tests, or JSON fixtures against the selected policy.
+    Test {
+        #[arg(long, conflicts_with = "changed_files")]
+        fixtures: Option<PathBuf>,
+        /// JSON array of proposed project-relative writes; noninteractive approvals fail closed.
+        #[arg(long, conflicts_with = "fixtures")]
+        changed_files: Option<PathBuf>,
+    },
 }
 fn execute(cli: &Cli) -> Result<(String, Value, u8), sentinel_core::Error> {
+    if matches!(cli.command, Command::Guard { .. }) && cli.format != Format::Text {
+        return Err(sentinel_core::Error::Arguments(
+            "Interactive guard requires --format text so provider output cannot corrupt JSON",
+        ));
+    }
+    if cli.format == Format::Sarif && !matches!(cli.command, Command::Scan { .. }) {
+        return Err(sentinel_core::Error::Arguments(
+            "SARIF output is supported only for scan",
+        ));
+    }
     if matches!(
         cli.command,
         Command::Scan {
@@ -145,29 +239,45 @@ fn execute(cli: &Cli) -> Result<(String, Value, u8), sentinel_core::Error> {
         Command::Scan { .. } => AuditCommand::Scan,
         Command::Audit { .. } => AuditCommand::Audit,
         Command::Doctor => AuditCommand::Doctor,
+        Command::Agent { .. }
+        | Command::Guard { .. }
+        | Command::Approvals { .. }
+        | Command::Redteam => AuditCommand::Audit,
     };
     let code = result
         .as_ref()
         .map(|(_, _, code)| *code)
         .unwrap_or_else(|error| error.exit_code() as u8);
-    let packages = result
-        .as_ref()
-        .ok()
-        .and_then(|(_, data, _)| data.get("packages_checked").and_then(Value::as_u64));
+    let packages = result.as_ref().ok().and_then(|(_, data, _)| {
+        data.get("packages_checked")
+            .or_else(|| data.pointer("/result/scan/packages_checked"))
+            .or_else(|| data.pointer("/runs/0/properties/packagesChecked"))
+            .and_then(Value::as_u64)
+    });
     let findings = result.as_ref().ok().and_then(|(_, data, _)| {
         data.get("findings")
+            .or_else(|| data.pointer("/result/scan/findings"))
+            .or_else(|| data.pointer("/runs/0/results"))
             .and_then(Value::as_array)
             .map(|values| values.len() as u64)
     });
     let logging = project.record_command(command, code, packages, findings);
     match (result, logging) {
         (Ok((message, mut data, code)), Ok(state)) => {
-            data["audit_logging"] = json!(state);
+            if cli.format == Format::Sarif {
+                data["runs"][0]["properties"]["auditLogging"] = json!(state);
+            } else {
+                data["audit_logging"] = json!(state);
+            }
             Ok((message, data, code))
         }
         (Ok((message, mut data, code)), Err(error)) => {
             eprintln!("warning: {error}");
-            data["audit_logging"] = json!("failed");
+            if cli.format == Format::Sarif {
+                data["runs"][0]["properties"]["auditLogging"] = json!("failed");
+            } else {
+                data["audit_logging"] = json!("failed");
+            }
             Ok((message, data, if code == 0 { 1 } else { code }))
         }
         (Err(error), logging) => {
@@ -198,7 +308,114 @@ fn execute_command(
 ) -> Result<(String, Value, u8), sentinel_core::Error> {
     match cli.command {
         Command::Doctor => Ok(doctor_result(cli)),
-        Command::Audit { limit, event } => {
+        Command::Agent { ref command } => {
+            let result = match command {
+                AgentCommand::Setup { provider } => {
+                    project.agent_setup_for(&std::env::current_exe()?, provider)?
+                }
+                AgentCommand::Status { provider } => project.agent_status_for(provider)?,
+                AgentCommand::Hook { .. } => {
+                    return Err(sentinel_core::Error::Arguments(
+                        "Hook callbacks use the provider protocol",
+                    ))
+                }
+            };
+            let code = if result.get("healthy") == Some(&json!(false)) {
+                1
+            } else {
+                0
+            };
+            Ok((
+                format!(
+                    "Agent integration: {}",
+                    if code == 0 {
+                        "configuration verified; inspect agent status --format json for enforcement limits"
+                    } else {
+                        "verification failed"
+                    }
+                ),
+                sentinel_core::v2("agent", result),
+                code,
+            ))
+        }
+        Command::Guard {
+            ref program,
+            ref scope,
+            ref provider,
+            allow_degraded_hooks,
+        } => {
+            let inferred = program
+                .first()
+                .and_then(|s| std::path::Path::new(s).file_stem())
+                .and_then(|s| s.to_str())
+                .filter(|s| matches!(*s, "claude" | "codex" | "copilot"))
+                .unwrap_or("claude");
+            let code = project.guard_for(
+                program,
+                scope.clone(),
+                provider.as_deref().unwrap_or(inferred),
+                allow_degraded_hooks,
+            )?;
+            Ok((
+                "Guarded provider exited".into(),
+                sentinel_core::v2("guard", json!({"exit_code":code})),
+                code,
+            ))
+        }
+        Command::Approvals { ref command } => {
+            let result = match command {
+                ApprovalCommand::List => project.approvals()?,
+                ApprovalCommand::Grant { id, binding } => project.approve(id, binding)?,
+            };
+            let text = serde_json::to_string_pretty(&result).map_err(|_| {
+                sentinel_core::Error::Security(1, "Approval output serialization failed")
+            })?;
+            Ok((
+                format!("Exact-action approvals (content redacted):\n{text}"),
+                sentinel_core::v2("approvals", result),
+                0,
+            ))
+        }
+        Command::Redteam => {
+            let result = project.redteam(&std::env::current_exe()?)?;
+            let code = if result["passed"] == true { 0 } else { 5 };
+            Ok((
+                format!(
+                    "Synthetic redteam fixtures: {}",
+                    if code == 0 { "passed" } else { "failed" }
+                ),
+                sentinel_core::v2("redteam", result),
+                code,
+            ))
+        }
+        Command::Audit {
+            command: Some(ref command),
+            ..
+        } => {
+            let result = match command {
+                AuditSubcommand::Verify { checkpoint } => {
+                    project.audit_verify(checkpoint.as_deref())?
+                }
+                AuditSubcommand::Checkpoint { output } => project
+                    .audit_checkpoint(&sentinel_core::checkpoint_path(&project.root, output))?,
+            };
+            Ok((
+                format!(
+                    "Audit integrity: {}",
+                    serde_json::to_string(&result).map_err(|_| sentinel_core::Error::Security(
+                        1,
+                        "Audit output serialization failed"
+                    ))?
+                ),
+                sentinel_core::v2("audit.integrity", result),
+                0,
+            ))
+        }
+        Command::Audit {
+            command: None,
+            limit,
+            event,
+        } => {
             let history = project.audit_history(limit as usize, event)?;
             let mut message = format!(
                 "Audit history: {} events, {} malformed records",
@@ -236,6 +453,10 @@ fn execute_command(
             ref sbom,
             scan_type,
             include_ignored,
+            reachability,
+            exploit_aware,
+            ref entrypoint,
+            ref python_import,
         } => {
             let report = project.scan(ProjectScanOptions {
                 offline,
@@ -246,10 +467,38 @@ fn execute_command(
                     ScanType::Secrets => ScanSelection::Secrets,
                 }),
             })?;
-            let code = report.exit_code(fail_on);
+            let mut code = report.exit_code(fail_on);
+            let analysis = if reachability || exploit_aware {
+                Some(project.analysis(
+                    &report,
+                    sentinel_core::AnalysisOptions {
+                        reachability,
+                        exploit_aware,
+                        offline,
+                        entrypoints: entrypoint.clone(),
+                        python_imports: sentinel_core::parse_imports(python_import)?,
+                    },
+                )?)
+            } else {
+                None
+            };
+            if let Some(a) = &analysis {
+                code = sentinel_core::enriched_exit(code, a);
+            }
+            if cli.format == Format::Sarif {
+                return Ok((
+                    "SARIF scan results".into(),
+                    sentinel_core::sarif(&report, analysis.as_ref()),
+                    code,
+                ));
+            }
             let mut message = format!(
                 "Scan {}: {} packages checked, {} files checked, {} findings",
-                report.status,
+                if report.complete && analysis.as_ref().is_none_or(|a| a.complete) {
+                    "complete"
+                } else {
+                    "incomplete"
+                },
                 report.packages_checked,
                 report.files_checked,
                 report.findings.len()
@@ -303,7 +552,54 @@ fn execute_command(
                     if cache.stale { " (stale)" } else { "" }
                 ));
             }
-            Ok((message, json!(report), code))
+            if let Some(a) = analysis {
+                message.push_str(&format!(
+                    "\nOptional analysis: {}",
+                    if a.complete {
+                        "complete within prototype scope"
+                    } else {
+                        "incomplete or unknown; inspect evidence"
+                    }
+                ));
+                for finding in &a.findings {
+                    let package = report
+                        .findings
+                        .iter()
+                        .find(|f| f.id == finding.finding_id)
+                        .and_then(|f| f.package.as_ref())
+                        .map(|p| format!("{} {} {}", p.ecosystem, p.name, p.version))
+                        .unwrap_or_else(|| "redacted secret finding".into());
+                    message.push_str(&format!("\nAnalysis {package}: {}; EPSS {}; KEV {}; risk {}/10; intelligence {}\n  {}",finding.reachability,finding.epss.map(|p|format!("{:.2}%",p*100.0)).unwrap_or_else(||"unknown".into()),finding.kev.map(|v|if v{"listed"}else{"not listed in the available catalog"}).unwrap_or("unknown"),finding.risk_score,finding.intelligence_status,finding.reachability_reason));
+                }
+                for diagnostic in &a.diagnostics {
+                    message.push_str(&format!("\nAnalysis: {diagnostic}"));
+                }
+                Ok((
+                    message,
+                    sentinel_core::v2("scan.enriched", json!({"scan":report,"analysis":a})),
+                    code,
+                ))
+            } else {
+                Ok((message, json!(report), code))
+            }
+        }
+        Command::Policy {
+            command:
+                PolicyCommand::Test {
+                    ref fixtures,
+                    ref changed_files,
+                },
+        } => {
+            let result = project.policy_test(fixtures.as_deref(), changed_files.as_deref())?;
+            let code = if result["passed"] == true { 0 } else { 5 };
+            Ok((
+                format!(
+                    "Policy fixtures: {}",
+                    if code == 0 { "passed" } else { "failed" }
+                ),
+                sentinel_core::v2("policy.test", result),
+                code,
+            ))
         }
         Command::Policy {
             command: PolicyCommand::Check,
@@ -357,9 +653,19 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    if matches!(
+        cli.command,
+        Command::Agent {
+            command: AgentCommand::Hook { .. }
+        }
+    ) {
+        return hook(&cli);
+    }
     match execute(&cli) {
         Ok((message, data, code)) => {
-            let result = if cli.format == Format::Json {
+            let result = if cli.format == Format::Sarif {
+                emit(&data)
+            } else if cli.format == Format::Json {
                 emit(&json!({"schema_version":1,"status":"ok","message":message,"data":data}))
             } else if !cli.quiet {
                 writeln!(io::stdout().lock(), "{message}")
@@ -381,7 +687,11 @@ fn main() -> ExitCode {
         }
         Err(error) => {
             let code = error.exit_code();
-            if cli.format == Format::Json {
+            if cli.format == Format::Sarif {
+                let _ = emit(
+                    &json!({"version":"2.1.0","runs":[{"tool":{"driver":{"name":"Sentinel"}},"results":[],"invocations":[{"executionSuccessful":false,"toolExecutionNotifications":[{"level":"error","message":{"text":error.to_string()}}]}]}]}),
+                );
+            } else if cli.format == Format::Json {
                 let _ = emit(
                     &json!({"schema_version":1,"status":"error","error":{"code":code,"message":error.to_string()}}),
                 );
@@ -389,5 +699,54 @@ fn main() -> ExitCode {
             eprintln!("error: {error}");
             ExitCode::from(code as u8)
         }
+    }
+}
+
+fn hook(cli: &Cli) -> ExitCode {
+    use std::io::Read;
+    let provider = match &cli.command {
+        Command::Agent {
+            command: AgentCommand::Hook { provider },
+        } => provider.as_str(),
+        _ => "claude",
+    };
+    if let (Ok(active), Ok(nonce), Ok(project)) = (
+        std::env::var("SENTINEL_GUARD_PROVIDER"),
+        std::env::var("SENTINEL_GUARD_NONCE"),
+        Project::resolve(&cli.project, &cli.config),
+    ) {
+        if sentinel_core::agent::Provider::parse(provider).is_ok_and(|configured| {
+            sentinel_core::agent::foreign_session(&project.root, configured, &active, &nonce)
+        }) {
+            return if emit(&json!({})).is_ok() {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(2)
+            };
+        }
+    }
+    let evaluate = (|| -> Result<sentinel_core::agent::GateResult, sentinel_core::Error> {
+        let mut bytes = Vec::new();
+        io::stdin().take(1024 * 1024 + 1).read_to_end(&mut bytes)?;
+        if bytes.len() > 1024 * 1024 {
+            return Err(sentinel_core::Error::Arguments("Hook input exceeds bound"));
+        }
+        let value: Value = serde_json::from_slice(&bytes)
+            .map_err(|_| sentinel_core::Error::Arguments("Malformed hook input"))?;
+        let nonce = std::env::var("SENTINEL_GUARD_NONCE")
+            .map_err(|_| sentinel_core::Error::Security(5, "No guarded session"))?;
+        let project = Project::resolve(&cli.project, &cli.config)?;
+        project.hook_for(&value, &nonce, provider)
+    })();
+    let (decision,reason)=match evaluate{Ok(r) if matches!(r.decision,sentinel_policy::Decision::Allow|sentinel_policy::Decision::LogOnly)=>("allow",r.code),Ok(r)=>("deny",r.code),Err(_)=>("deny","SENTINEL_FAIL_CLOSED: policy, session, audit, installation, or input verification failed")};
+    let verdict = if provider == "copilot" {
+        json!({"permissionDecision":decision,"permissionDecisionReason":reason})
+    } else {
+        json!({"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":decision,"permissionDecisionReason":reason}})
+    };
+    if emit(&verdict).is_ok() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(2)
     }
 }

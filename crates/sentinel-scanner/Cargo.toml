@@ -18,3 +18,8 @@ tempfile.workspace = true
 semver.workspace = true
 cvss.workspace = true
 regex.workspace = true
+pep508_rs.workspace = true
+globset.workspace = true
+time.workspace = true
+sentinel-audit = { path = "../sentinel-audit" }
+sentinel-policy = { path = "../sentinel-policy" }

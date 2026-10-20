@@ -1,3 +1,7 @@
+# Version scope
+
+The sections below describe the compatible version-1 command log. v0.0.2 adds optional integrity chains, an attached agent decision journal, checkpoints, and guarded Claude diagnostics; see [the security guide](v0.0.2-security.md).
+
 # Local auditing and doctor diagnostics
 
 ## Audit history
@@ -30,6 +34,8 @@ sentinel doctor --project ./backend --config security.yml
 ```
 
 Doctor runs offline. It reports build and supported policy-schema versions, project resolution, configuration validity, audit storage/readability, native dependency-input compatibility, cache storage, cached intelligence, and supported capabilities. It never queries OSV or invokes package managers or agents. Cache inspection examines up to 1000 discovered package identities, counting current, stale, missing, and invalid entries. Native discovery retains its documented bounds and exclusions; SBOM coverage is not inferred by doctor.
+
+In the v0.0.2 development source, the existing `scanner.dependencies` check summarizes Python lockfile conflicts, unresolved versions, conflicting constraints, uncovered/private sources or includes, and requirements inventories with unproven transitive coverage. All simultaneous categories are reported, without raw input, package-source URLs, or credentials. Warnings remain exit 0 for doctor, while dependency scans with the same coverage gaps remain exit 7. A supported uv/Poetry inventory with fresh cached intelligence can pass; this does not establish lockfile freshness or equivalence with an installed environment. The version-1 JSON shape, check IDs, and capabilities are unchanged.
 
 Storage checks create missing Sentinel storage directories and use temporary write/sync/delete probes. They do not edit the policy or dependency lockfiles. Doctor is itself audited when a project root is available and audit logging is enabled. Existing busy or oversized audit logs fail the storage checks.
 

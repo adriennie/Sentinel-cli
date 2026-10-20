@@ -315,6 +315,9 @@ mod tests {
                         }
                     }
                 };
+                // Windows may inherit the listener's nonblocking mode. The
+                // accepted stream uses bounded blocking reads on every platform.
+                socket.set_nonblocking(false).unwrap();
                 socket
                     .set_read_timeout(Some(Duration::from_secs(3)))
                     .unwrap();
@@ -322,6 +325,10 @@ mod tests {
                 let mut buffer = [0; 4096];
                 loop {
                     let count = socket.read(&mut buffer).unwrap();
+                    assert!(
+                        count > 0,
+                        "Mock client closed before sending a full request"
+                    );
                     bytes.extend_from_slice(&buffer[..count]);
                     if let Some(end) = bytes.windows(4).position(|w| w == b"\r\n\r\n") {
                         let headers = String::from_utf8_lossy(&bytes[..end]).to_ascii_lowercase();

@@ -13,7 +13,7 @@ pub enum CheckStatus {
 pub struct Check {
     pub id: &'static str,
     pub status: CheckStatus,
-    pub message: &'static str,
+    pub message: String,
     pub remediation: &'static str,
 }
 #[derive(Debug, Serialize)]
@@ -62,7 +62,7 @@ impl DoctorReport {
         self.checks.push(Check {
             id,
             status,
-            message,
+            message: message.into(),
             remediation,
         });
     }
@@ -171,16 +171,46 @@ pub fn doctor_at(root: &Path, config: &Path) -> DoctorReport {
             report.add(
                 "scanner.dependencies",
                 CheckStatus::Pass,
-                "Discovered lockfiles are supported within native scanner coverage",
+                "Discovered Cargo, npm, uv or Poetry lockfile inventories are supported; freshness and installed-environment equivalence are not verified",
                 "None",
             );
         } else {
-            report.add(
-                "scanner.dependencies",
-                CheckStatus::Warn,
-                "Dependency discovery has missing, unsupported, or unreadable inputs",
-                "Run sentinel scan for coverage details, or supply a supported CycloneDX SBOM",
-            );
+            let categories = [
+                ("python_lock_conflict", "conflicting Python lockfiles"),
+                (
+                    "python_manifest_unresolved",
+                    "unresolved Python manifest or workspace",
+                ),
+                ("python_version_unresolved", "unresolved Python versions"),
+                (
+                    "python_constraint_conflict",
+                    "conflicting Python constraints",
+                ),
+                (
+                    "python_source_uncovered",
+                    "private or unsupported Python sources/includes",
+                ),
+                (
+                    "python_inventory_partial",
+                    "requirements inventory has unproven transitive coverage",
+                ),
+                (
+                    "unsupported_dependency",
+                    "missing, unsupported, or unreadable dependency inputs",
+                ),
+            ];
+            let gaps: Vec<_> = categories
+                .iter()
+                .filter(|(code, _)| inventory.diagnostics.iter().any(|d| d.code == *code))
+                .map(|(_, label)| *label)
+                .collect();
+            let message = format!("Dependency discovery is incomplete: {}", gaps.join("; "));
+            report.checks.push(Check {
+                id: "scanner.dependencies",
+                status: CheckStatus::Warn,
+                message,
+                remediation: "Run sentinel scan --type dependencies for file-level diagnostics; reconcile lockfiles and exact pins; private sources are not queried as PyPI",
+            });
         }
         match sentinel_audit::probe_directory(&project.root, &[".sentinel", "cache", "osv-v1"]) {
             Ok(()) => report.add(
@@ -222,11 +252,33 @@ pub fn doctor_at(root: &Path, config: &Path) -> DoctorReport {
         "Local pattern-based secrets scanning is available",
         "Use sentinel scan --type secrets; ignored files require --include-ignored",
     );
-    report.add(
-        "integrations",
-        CheckStatus::Pass,
-        "This release has no runtime agent integration or enforcement",
-        "None",
-    );
+    if project
+        .root
+        .join(".sentinel/agent/installation.json")
+        .symlink_metadata()
+        .is_ok()
+    {
+        match sentinel_agent::status(&project.root,&project.config){
+            Ok(health) if health.healthy=>{report.capabilities.agent_enforcement=true;report.add("integrations",CheckStatus::Pass,"Claude hook installation verified; enforcement applies only inside a verified sentinel guard session", "Use sentinel agent status for coverage; hooks are not an OS sandbox");}
+            _=>report.add("integrations",CheckStatus::Fail,"Claude hook installation is missing, changed, or unsafe","Reconcile settings and reinstall the verified gate before starting a guarded session"),
+        }
+    } else {
+        report.add("integrations",CheckStatus::Pass,"No active agent gate is claimed; Claude integration is available through explicit setup and guard","Use sentinel agent setup claude, inspect coverage, then sentinel guard -- claude");
+    }
+    for provider in ["codex", "copilot"] {
+        if project
+            .root
+            .join(format!(".sentinel/agent/installation-{provider}.json"))
+            .exists()
+        {
+            let healthy = crate::agent::Provider::parse(provider)
+                .ok()
+                .and_then(|p| crate::agent::status_for(&project.root, &project.config, p).ok())
+                .is_some_and(|v| v["healthy"] == true);
+            report.add(if provider=="codex"{"integrations.codex"}else{"integrations.copilot"}, CheckStatus::Warn,
+                if healthy {"Best-effort hook configuration verified; upstream errors/timeouts or missing trust can bypass it"}else{"Provider hook configuration or executable failed verification"},
+                "Inspect agent status --provider; real-client tool execution is not yet validated");
+        }
+    }
     report.finish()
 }

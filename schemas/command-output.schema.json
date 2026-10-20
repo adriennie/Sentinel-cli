@@ -861,6 +861,1140 @@
                   }
                 }
               ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "schema_version": {
+                  "const": 2
+                },
+                "command": {
+                  "const": "agent"
+                },
+                "result": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schema_version": {
+                          "const": 2
+                        },
+                        "healthy": {
+                          "type": "boolean"
+                        },
+                        "adapter": {
+                          "const": "claude-pretooluse-v2"
+                        },
+                        "minimum_claude_version": {
+                          "type": "string"
+                        },
+                        "coverage": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "limitations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "schema_version",
+                        "healthy",
+                        "adapter",
+                        "minimum_claude_version",
+                        "coverage",
+                        "limitations"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schema_version": {
+                          "const": 2
+                        },
+                        "healthy": {
+                          "type": "boolean"
+                        },
+                        "provider": {
+                          "enum": [
+                            "codex",
+                            "copilot"
+                          ]
+                        },
+                        "adapter": {
+                          "enum": [
+                            "codex-pretooluse-v2",
+                            "copilot-pretooluse-v2"
+                          ]
+                        },
+                        "enforcement": {
+                          "const": "best_effort"
+                        },
+                        "client_validation": {
+                          "const": "protocol_fixtures_only"
+                        },
+                        "coverage": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "limitations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "schema_version",
+                        "healthy",
+                        "provider",
+                        "adapter",
+                        "enforcement",
+                        "client_validation",
+                        "coverage",
+                        "limitations"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "audit_logging": {
+                  "enum": [
+                    "recorded",
+                    "disabled",
+                    "failed"
+                  ]
+                }
+              },
+              "required": [
+                "schema_version",
+                "command",
+                "result"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "schema_version": {
+                  "const": 2
+                },
+                "command": {
+                  "const": "guard"
+                },
+                "result": {
+                  "type": "object",
+                  "properties": {
+                    "exit_code": {
+                      "enum": [
+                        0,
+                        1
+                      ]
+                    }
+                  },
+                  "required": [
+                    "exit_code"
+                  ],
+                  "additionalProperties": false
+                },
+                "audit_logging": {
+                  "enum": [
+                    "recorded",
+                    "disabled",
+                    "failed"
+                  ]
+                }
+              },
+              "required": [
+                "schema_version",
+                "command",
+                "result"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "schema_version": {
+                  "const": 2
+                },
+                "command": {
+                  "const": "approvals"
+                },
+                "result": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "schema_version": {
+                            "const": 2
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "binding": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          },
+                          "actor": {
+                            "enum": [
+                              "claude",
+                              "codex",
+                              "copilot"
+                            ]
+                          },
+                          "session_hash": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          },
+                          "action_hash": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          },
+                          "paths": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "operation": {
+                            "enum": [
+                              "file.read",
+                              "file.write",
+                              "shell.execute",
+                              "network.access"
+                            ]
+                          },
+                          "expires_at": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "status": {
+                            "enum": [
+                              "pending",
+                              "granted",
+                              "consumed",
+                              "denied"
+                            ]
+                          },
+                          "preview": {
+                            "type": "string"
+                          },
+                          "matched_rules": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "risk_score": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 10
+                          },
+                          "risk_explanation": {
+                            "type": "string"
+                          },
+                          "risk_evidence": {
+                            "type": "object",
+                            "properties": {
+                              "protected_path": {
+                                "type": "boolean"
+                              },
+                              "destructive_operation": {
+                                "type": "boolean"
+                              },
+                              "secret_access": {
+                                "type": "boolean"
+                              },
+                              "reachable_dependency": {
+                                "type": "boolean"
+                              },
+                              "known_exploitation": {
+                                "type": "boolean"
+                              },
+                              "high_epss": {
+                                "type": "boolean"
+                              },
+                              "uncertain": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "protected_path",
+                              "destructive_operation",
+                              "secret_access",
+                              "reachable_dependency",
+                              "known_exploitation",
+                              "high_epss",
+                              "uncertain"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "schema_version",
+                          "id",
+                          "binding",
+                          "actor",
+                          "session_hash",
+                          "action_hash",
+                          "paths",
+                          "operation",
+                          "expires_at",
+                          "status",
+                          "preview",
+                          "matched_rules",
+                          "risk_score",
+                          "risk_explanation",
+                          "risk_evidence"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "granted": {
+                          "const": true
+                        },
+                        "expires": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "granted",
+                        "expires"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "audit_logging": {
+                  "enum": [
+                    "recorded",
+                    "disabled",
+                    "failed"
+                  ]
+                }
+              },
+              "required": [
+                "schema_version",
+                "command",
+                "result"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "schema_version": {
+                  "const": 2
+                },
+                "command": {
+                  "const": "audit.integrity"
+                },
+                "result": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schema_version": {
+                          "const": 2
+                        },
+                        "complete": {
+                          "const": true
+                        },
+                        "records": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "head": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "checkpoint_status": {
+                          "enum": [
+                            "matched_independent_snapshot_not_authenticated",
+                            "not_supplied_truncation_not_proven"
+                          ]
+                        },
+                        "agent_decisions_verified": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "schema_version",
+                        "complete",
+                        "records",
+                        "head",
+                        "checkpoint_status",
+                        "agent_decisions_verified"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schema_version": {
+                          "const": 2
+                        },
+                        "project": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "records": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "head": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "required": [
+                        "schema_version",
+                        "project",
+                        "records",
+                        "head"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "audit_logging": {
+                  "enum": [
+                    "recorded",
+                    "disabled",
+                    "failed"
+                  ]
+                }
+              },
+              "required": [
+                "schema_version",
+                "command",
+                "result"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "schema_version": {
+                  "const": 2
+                },
+                "command": {
+                  "const": "policy.test"
+                },
+                "result": {
+                  "type": "object",
+                  "properties": {
+                    "scope": {
+                      "enum": [
+                        "selected_project_policy",
+                        "built_in_level_invariants",
+                        "proposed_project_changes"
+                      ]
+                    },
+                    "passed": {
+                      "type": "boolean"
+                    },
+                    "tests": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "index": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "passed": {
+                            "type": "boolean"
+                          },
+                          "actual": {
+                            "enum": [
+                              "allow",
+                              "log_only",
+                              "require_approval",
+                              "deny"
+                            ]
+                          },
+                          "expected": {
+                            "enum": [
+                              "allow",
+                              "log_only",
+                              "require_approval",
+                              "deny"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "index",
+                          "passed",
+                          "actual",
+                          "expected"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "benchmark": {
+                      "type": "object",
+                      "properties": {
+                        "iterations": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1000
+                        },
+                        "total_nanoseconds": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "iterations",
+                        "total_nanoseconds"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "scope",
+                    "passed",
+                    "tests",
+                    "benchmark"
+                  ],
+                  "additionalProperties": false
+                },
+                "audit_logging": {
+                  "enum": [
+                    "recorded",
+                    "disabled",
+                    "failed"
+                  ]
+                }
+              },
+              "required": [
+                "schema_version",
+                "command",
+                "result"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "schema_version": {
+                  "const": 2
+                },
+                "command": {
+                  "const": "redteam"
+                },
+                "result": {
+                  "type": "object",
+                  "properties": {
+                    "passed": {
+                      "type": "boolean"
+                    },
+                    "scope": {
+                      "type": "string"
+                    },
+                    "tests": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "passed": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "passed"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "passed",
+                    "scope",
+                    "tests"
+                  ],
+                  "additionalProperties": false
+                },
+                "audit_logging": {
+                  "enum": [
+                    "recorded",
+                    "disabled",
+                    "failed"
+                  ]
+                }
+              },
+              "required": [
+                "schema_version",
+                "command",
+                "result"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "schema_version": {
+                  "const": 2
+                },
+                "command": {
+                  "const": "scan.enriched"
+                },
+                "result": {
+                  "type": "object",
+                  "properties": {
+                    "scan": {
+                      "type": "object",
+                      "properties": {
+                        "schema_version": {
+                          "const": 1
+                        },
+                        "coverage": {
+                          "enum": [
+                            "provided_sbom_components",
+                            "supported_registry_dependencies",
+                            "supported_text_files",
+                            "configured_scanners"
+                          ]
+                        },
+                        "inputs": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "status": {
+                          "enum": [
+                            "complete",
+                            "incomplete"
+                          ]
+                        },
+                        "complete": {
+                          "type": "boolean"
+                        },
+                        "packages_discovered": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "packages_checked": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "files_checked": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "findings": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "schema_version": {
+                                    "const": 1
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                    "pattern": "^[0-9a-f]{64}$"
+                                  },
+                                  "rule_id": {
+                                    "type": "string"
+                                  },
+                                  "severity": {
+                                    "enum": [
+                                      "unknown",
+                                      "low",
+                                      "medium",
+                                      "high",
+                                      "critical"
+                                    ]
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "files": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "remediation": {
+                                    "type": "string"
+                                  },
+                                  "reachability": {
+                                    "const": "not_analyzed"
+                                  },
+                                  "category": {
+                                    "enum": [
+                                      "dependency_vulnerability",
+                                      "dependency_maintenance",
+                                      "dependency_advisory"
+                                    ]
+                                  },
+                                  "package": {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "version": {
+                                        "type": "string"
+                                      },
+                                      "ecosystem": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "name",
+                                      "version",
+                                      "ecosystem"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "evidence": {
+                                    "type": "object",
+                                    "properties": {
+                                      "source": {
+                                        "const": "OSV"
+                                      },
+                                      "advisory_id": {
+                                        "type": "string"
+                                      },
+                                      "advisory_kind": {
+                                        "enum": [
+                                          "vulnerability",
+                                          "maintenance",
+                                          "unknown"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "source",
+                                      "advisory_id",
+                                      "advisory_kind"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "schema_version",
+                                  "id",
+                                  "rule_id",
+                                  "severity",
+                                  "title",
+                                  "files",
+                                  "remediation",
+                                  "reachability",
+                                  "category",
+                                  "package",
+                                  "evidence"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "schema_version": {
+                                    "const": 1
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                    "pattern": "^[0-9a-f]{64}$"
+                                  },
+                                  "rule_id": {
+                                    "type": "string"
+                                  },
+                                  "severity": {
+                                    "enum": [
+                                      "unknown",
+                                      "low",
+                                      "medium",
+                                      "high",
+                                      "critical"
+                                    ]
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "files": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "remediation": {
+                                    "type": "string"
+                                  },
+                                  "reachability": {
+                                    "const": "not_analyzed"
+                                  },
+                                  "category": {
+                                    "const": "secret"
+                                  },
+                                  "location": {
+                                    "type": "object",
+                                    "properties": {
+                                      "file": {
+                                        "type": "string"
+                                      },
+                                      "line": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                      },
+                                      "column": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "file",
+                                      "line",
+                                      "column"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "evidence": {
+                                    "type": "object",
+                                    "properties": {
+                                      "source": {
+                                        "const": "Sentinel"
+                                      },
+                                      "redacted": {
+                                        "const": "[REDACTED]"
+                                      }
+                                    },
+                                    "required": [
+                                      "source",
+                                      "redacted"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "schema_version",
+                                  "id",
+                                  "rule_id",
+                                  "severity",
+                                  "title",
+                                  "files",
+                                  "remediation",
+                                  "reachability",
+                                  "category",
+                                  "location",
+                                  "evidence"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
+                          "maxItems": 100000
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "package": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "version": {
+                                        "type": "string"
+                                      },
+                                      "ecosystem": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "name",
+                                      "version",
+                                      "ecosystem"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "file": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "package",
+                              "file",
+                              "code",
+                              "message"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "cache": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "package": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "version": {
+                                    "type": "string"
+                                  },
+                                  "ecosystem": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "name",
+                                  "version",
+                                  "ecosystem"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "age_seconds": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "stale": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "package",
+                              "age_seconds",
+                              "stale"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "audit_logging": {
+                          "enum": [
+                            "recorded",
+                            "disabled",
+                            "failed"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "schema_version",
+                        "coverage",
+                        "inputs",
+                        "status",
+                        "complete",
+                        "packages_discovered",
+                        "packages_checked",
+                        "files_checked",
+                        "findings",
+                        "diagnostics",
+                        "cache"
+                      ],
+                      "additionalProperties": false,
+                      "allOf": [
+                        {
+                          "if": {
+                            "properties": {
+                              "complete": {
+                                "const": true
+                              }
+                            }
+                          },
+                          "then": {
+                            "properties": {
+                              "status": {
+                                "const": "complete"
+                              }
+                            }
+                          },
+                          "else": {
+                            "properties": {
+                              "status": {
+                                "const": "incomplete"
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "analysis": {
+                      "type": "object",
+                      "properties": {
+                        "schema_version": {
+                          "const": 2
+                        },
+                        "complete": {
+                          "type": "boolean"
+                        },
+                        "scope": {
+                          "type": "string"
+                        },
+                        "findings": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "finding_id": {
+                                "type": "string",
+                                "pattern": "^[a-f0-9]{64}$"
+                              },
+                              "reachability": {
+                                "enum": [
+                                  "reachable",
+                                  "not_reachable",
+                                  "unknown",
+                                  "not_analyzed"
+                                ]
+                              },
+                              "reachability_reason": {
+                                "type": "string"
+                              },
+                              "cves": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^CVE-[0-9]{4}-[0-9]{4,12}$"
+                                }
+                              },
+                              "epss": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "epss_source_dates": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "kev": {
+                                "anyOf": [
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "kev_source_date": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "intelligence_status": {
+                                "enum": [
+                                  "fresh",
+                                  "unavailable",
+                                  "not_requested",
+                                  "missing_stale_or_unmapped",
+                                  "not_applicable_no_advisory"
+                                ]
+                              },
+                              "risk_score": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10
+                              }
+                            },
+                            "required": [
+                              "finding_id",
+                              "reachability",
+                              "reachability_reason",
+                              "cves",
+                              "epss",
+                              "epss_source_dates",
+                              "kev",
+                              "kev_source_date",
+                              "intelligence_status",
+                              "risk_score"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "schema_version",
+                        "complete",
+                        "scope",
+                        "findings",
+                        "diagnostics"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "scan",
+                    "analysis"
+                  ],
+                  "additionalProperties": false
+                },
+                "audit_logging": {
+                  "enum": [
+                    "recorded",
+                    "disabled",
+                    "failed"
+                  ]
+                }
+              },
+              "required": [
+                "schema_version",
+                "command",
+                "result"
+              ],
+              "additionalProperties": false
             }
           ]
         }

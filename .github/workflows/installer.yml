@@ -1,0 +1,28 @@
+name: Installer
+on:
+  push:
+    paths: ['install.sh', 'scripts/test_installer.py', '.github/workflows/installer.yml']
+  pull_request:
+    paths: ['install.sh', 'scripts/test_installer.py', '.github/workflows/installer.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  installer:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Bash syntax and offline installer regression tests
+        shell: bash
+        run: |
+          bash -n install.sh
+          python3 -m unittest discover -s scripts -p test_installer.py

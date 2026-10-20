@@ -18,4 +18,4 @@
 
 Implementation checkmarks describe available code, not a claim that a release has been published. For a release-ready draft, require the exact-commit four-target CI run and release-bundle artifact, fresh matching dependency-review evidence, and verified checksums. The pipeline generates `release-evidence.json` only after native validation and all archive checks succeed. See release-acceptance.md and the draft's evidence file for the actual run.
 
-Agent interception, approvals, audit integrity verification, and reachability analysis remain v0.0.2 work.
+The v0.0.2 continuation is tracked in [the v0.0.2 checklist](v0.0.2-checklist.md).
