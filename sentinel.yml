@@ -1,0 +1,20 @@
+schema_version: 1
+project:
+  name: Sentinel-cli
+  level: L1
+policy:
+  default_action: allow
+  protected_paths:
+  - src/auth/**
+  - src/payments/**
+  - .github/workflows/**
+  - .env*
+  - sentinel.yml
+  rules: []
+scanning:
+  dependencies: true
+  secrets: true
+  offline: false
+audit:
+  enabled: true
+  redact_secrets: true

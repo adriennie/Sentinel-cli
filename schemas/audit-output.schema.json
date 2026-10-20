@@ -1,0 +1,302 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "status": {
+          "const": "ok"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "events": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "schema_version": {
+                    "const": 1
+                  },
+                  "event_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                  },
+                  "session_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "maxLength": 40
+                  },
+                  "event_type": {
+                    "enum": [
+                      "command.completed",
+                      "policy.validated",
+                      "scan.completed"
+                    ]
+                  },
+                  "command": {
+                    "enum": [
+                      "init",
+                      "policy.check",
+                      "scan",
+                      "doctor",
+                      "audit"
+                    ]
+                  },
+                  "outcome": {
+                    "enum": [
+                      "success",
+                      "failure",
+                      "findings",
+                      "incomplete"
+                    ]
+                  },
+                  "exit_code": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 8
+                  },
+                  "packages_checked": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "findings_count": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "schema_version",
+                  "event_id",
+                  "session_id",
+                  "timestamp",
+                  "event_type",
+                  "command",
+                  "outcome",
+                  "exit_code",
+                  "packages_checked",
+                  "findings_count"
+                ],
+                "additionalProperties": false,
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "exit_code": {
+                          "const": 0
+                        }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "outcome": {
+                          "const": "success"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "exit_code": {
+                          "const": 4
+                        }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "outcome": {
+                          "const": "findings"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "exit_code": {
+                          "const": 7
+                        }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "outcome": {
+                          "const": "incomplete"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "exit_code": {
+                          "not": {
+                            "enum": [
+                              0,
+                              4,
+                              7
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "outcome": {
+                          "const": "failure"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "event_type": {
+                          "const": "policy.validated"
+                        }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "command": {
+                          "const": "policy.check"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "event_type": {
+                          "const": "scan.completed"
+                        }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "command": {
+                          "const": "scan"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              "maxItems": 10000
+            },
+            "malformed_records": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "complete": {
+              "type": "boolean"
+            },
+            "audit_logging": {
+              "enum": [
+                "recorded",
+                "disabled",
+                "failed"
+              ]
+            }
+          },
+          "required": [
+            "schema_version",
+            "events",
+            "malformed_records",
+            "complete",
+            "audit_logging"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "malformed_records": {
+                    "const": 0
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "complete": {
+                    "const": true
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "complete": {
+                    "const": false
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "status",
+        "message",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "status": {
+          "const": "error"
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "status",
+        "error"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

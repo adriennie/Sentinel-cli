@@ -1,0 +1,14 @@
+[package]
+name = "sentinel-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+sentinel-policy = { path = "../sentinel-policy" }
+serde-saphyr.workspace = true
+thiserror.workspace = true
+tempfile.workspace = true
+sentinel-scanner = { path = "../sentinel-scanner" }
+sentinel-audit = { path = "../sentinel-audit" }
+serde.workspace = true

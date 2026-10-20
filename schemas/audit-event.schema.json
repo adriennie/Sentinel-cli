@@ -1,0 +1,182 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "maxLength": 40
+    },
+    "event_type": {
+      "enum": [
+        "command.completed",
+        "policy.validated",
+        "scan.completed"
+      ]
+    },
+    "command": {
+      "enum": [
+        "init",
+        "policy.check",
+        "scan",
+        "doctor",
+        "audit"
+      ]
+    },
+    "outcome": {
+      "enum": [
+        "success",
+        "failure",
+        "findings",
+        "incomplete"
+      ]
+    },
+    "exit_code": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8
+    },
+    "packages_checked": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "findings_count": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    }
+  },
+  "required": [
+    "schema_version",
+    "event_id",
+    "session_id",
+    "timestamp",
+    "event_type",
+    "command",
+    "outcome",
+    "exit_code",
+    "packages_checked",
+    "findings_count"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "exit_code": {
+            "const": 0
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "outcome": {
+            "const": "success"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "exit_code": {
+            "const": 4
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "outcome": {
+            "const": "findings"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "exit_code": {
+            "const": 7
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "outcome": {
+            "const": "incomplete"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "exit_code": {
+            "not": {
+              "enum": [
+                0,
+                4,
+                7
+              ]
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "outcome": {
+            "const": "failure"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "policy.validated"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "command": {
+            "const": "policy.check"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "scan.completed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "command": {
+            "const": "scan"
+          }
+        }
+      }
+    }
+  ]
+}
