@@ -11,6 +11,42 @@ fn run(root: &TempDir, args: &[&str]) -> Output {
         .unwrap()
 }
 #[test]
+fn python_lockfile_discovery_offline_json_reports_missing_intelligence() {
+    let root = TempDir::new().unwrap();
+    assert!(run(&root, &["init"]).status.success());
+    fs::write(
+        root.path().join("uv.lock"),
+        r#"
+version = 1
+revision = 5
+[[package]]
+name = "Example_Package"
+version = "1.2"
+source = { registry = "https://pypi.org/simple" }
+"#,
+    )
+    .unwrap();
+    let output = run(
+        &root,
+        &[
+            "scan",
+            "--type",
+            "dependencies",
+            "--offline",
+            "--format",
+            "json",
+        ],
+    );
+    assert_eq!(output.status.code(), Some(7));
+    assert!(output.stderr.is_empty());
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["schema_version"], 1);
+    assert_eq!(value["data"]["packages_discovered"], 1);
+    assert_eq!(value["data"]["complete"], false);
+    assert_eq!(value["data"]["inputs"][0], "uv.lock");
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("No supported dependency lockfiles"));
+}
+#[test]
 fn initialization_levels_and_preservation() {
     for level in ["L0", "L1", "L2", "L3"] {
         let root = TempDir::new().unwrap();
@@ -309,4 +345,91 @@ fn sbom_and_missing_intelligence_cli() {
         run(&root, &["scan", "--type", "secrets"]).status.code(),
         Some(0)
     );
+}
+
+#[test]
+fn poetry_and_requirements_json_findings_audit_and_exit_contracts() {
+    use sha2::{Digest, Sha256};
+    let schema: serde_json::Value =
+        serde_json::from_str(include_str!("../../../schemas/command-output.schema.json")).unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    for requirements in [false, true] {
+        let root = TempDir::new().unwrap();
+        assert!(run(&root, &["init"]).status.success());
+        if requirements {
+            fs::write(
+                root.path().join("requirements.txt"),
+                "-r base.txt\n-c constraints.txt\n",
+            )
+            .unwrap();
+            fs::write(root.path().join("base.txt"), "example>=1\n").unwrap();
+            fs::write(root.path().join("constraints.txt"), "example==1.0\n").unwrap();
+        } else {
+            fs::write(
+                root.path().join("poetry.lock"),
+                "[[package]]\nname='example'\nversion='1.0'\n[metadata]\nlock-version='2.1'",
+            )
+            .unwrap();
+        }
+        let directory = root.path().join(".sentinel/cache/osv-v1");
+        fs::create_dir_all(&directory).unwrap();
+        let key = format!(
+            "{:x}",
+            Sha256::digest(br#"{"ecosystem":"PyPI","name":"example","version":"1.0"}"#)
+        );
+        let value = serde_json::json!({"schema_version":1,"package":{"ecosystem":"PyPI","name":"example","version":"1.0"},"fetched_at":std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs(),"advisories":[{"id":"TEST-PY-001","severity":"high"}]});
+        fs::write(
+            directory.join(format!("{key}.json")),
+            serde_json::to_vec(&value).unwrap(),
+        )
+        .unwrap();
+        let output = run(
+            &root,
+            &[
+                "scan",
+                "--type",
+                "dependencies",
+                "--offline",
+                "--format=json",
+            ],
+        );
+        assert_eq!(output.status.code(), Some(if requirements { 7 } else { 4 }));
+        assert!(output.stderr.is_empty());
+        let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert!(validator.is_valid(&value));
+        assert_eq!(value["data"]["packages_checked"], 1);
+        assert_eq!(
+            value["data"]["findings"][0]["evidence"]["advisory_id"],
+            "TEST-PY-001"
+        );
+        let text = run(&root, &["scan", "--type", "dependencies", "--offline"]);
+        assert!(String::from_utf8_lossy(&text.stdout).contains("TEST-PY-001"));
+        assert!(text.stderr.is_empty());
+        if requirements {
+            fs::write(
+                root.path().join("base.txt"),
+                "example==1\n--index-url https://user:PRIVATE_TEST_VALUE@example.test/simple\n",
+            )
+            .unwrap();
+            let output = run(
+                &root,
+                &[
+                    "scan",
+                    "--type",
+                    "dependencies",
+                    "--offline",
+                    "--format=json",
+                ],
+            );
+            assert_eq!(output.status.code(), Some(7));
+            let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert!(validator.is_valid(&value));
+            assert_eq!(value["data"]["packages_discovered"], 0);
+            for bytes in [&output.stdout, &output.stderr] {
+                assert!(!String::from_utf8_lossy(bytes).contains("PRIVATE_TEST_VALUE"));
+            }
+            let audit = fs::read_to_string(root.path().join(".sentinel/audit.jsonl")).unwrap();
+            assert!(!audit.contains("PRIVATE_TEST_VALUE"));
+        }
+    }
 }

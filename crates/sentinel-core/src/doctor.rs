@@ -13,7 +13,7 @@ pub enum CheckStatus {
 pub struct Check {
     pub id: &'static str,
     pub status: CheckStatus,
-    pub message: &'static str,
+    pub message: String,
     pub remediation: &'static str,
 }
 #[derive(Debug, Serialize)]
@@ -62,7 +62,7 @@ impl DoctorReport {
         self.checks.push(Check {
             id,
             status,
-            message,
+            message: message.into(),
             remediation,
         });
     }
@@ -171,16 +171,42 @@ pub fn doctor_at(root: &Path, config: &Path) -> DoctorReport {
             report.add(
                 "scanner.dependencies",
                 CheckStatus::Pass,
-                "Discovered lockfiles are supported within native scanner coverage",
+                "Discovered Cargo, npm, uv or Poetry lockfile inventories are supported; freshness and installed-environment equivalence are not verified",
                 "None",
             );
         } else {
-            report.add(
-                "scanner.dependencies",
-                CheckStatus::Warn,
-                "Dependency discovery has missing, unsupported, or unreadable inputs",
-                "Run sentinel scan for coverage details, or supply a supported CycloneDX SBOM",
-            );
+            let categories = [
+                ("python_lock_conflict", "conflicting Python lockfiles"),
+                ("python_version_unresolved", "unresolved Python versions"),
+                (
+                    "python_constraint_conflict",
+                    "conflicting Python constraints",
+                ),
+                (
+                    "python_source_uncovered",
+                    "private or unsupported Python sources/includes",
+                ),
+                (
+                    "python_inventory_partial",
+                    "requirements inventory has unproven transitive coverage",
+                ),
+                (
+                    "unsupported_dependency",
+                    "missing, unsupported, or unreadable dependency inputs",
+                ),
+            ];
+            let gaps: Vec<_> = categories
+                .iter()
+                .filter(|(code, _)| inventory.diagnostics.iter().any(|d| d.code == *code))
+                .map(|(_, label)| *label)
+                .collect();
+            let message = format!("Dependency discovery is incomplete: {}", gaps.join("; "));
+            report.checks.push(Check {
+                id: "scanner.dependencies",
+                status: CheckStatus::Warn,
+                message,
+                remediation: "Run sentinel scan --type dependencies for file-level diagnostics; reconcile lockfiles and exact pins; private sources are not queried as PyPI",
+            });
         }
         match sentinel_audit::probe_directory(&project.root, &[".sentinel", "cache", "osv-v1"]) {
             Ok(()) => report.add(

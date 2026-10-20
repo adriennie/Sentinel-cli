@@ -1,6 +1,8 @@
 //! Dependency inventory, bounded OSV queries and timestamped local intelligence.
 mod inventory;
 mod osv;
+mod python;
+mod requirements;
 mod scan;
 mod secrets;
 pub use inventory::{discover, parse_cargo, parse_npm, parse_sbom, Inventory};

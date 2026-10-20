@@ -18,3 +18,4 @@ tempfile.workspace = true
 semver.workspace = true
 cvss.workspace = true
 regex.workspace = true
+pep508_rs.workspace = true
