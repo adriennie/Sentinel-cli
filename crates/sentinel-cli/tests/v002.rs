@@ -239,3 +239,69 @@ fn proposed_pr_changes_reject_protected_writes_without_executing_them() {
     );
     assert!(!root.path().join("src/main.rs").exists());
 }
+
+#[test]
+fn codex_and_copilot_cli_lifecycle_and_contracts() {
+    let root = TempDir::new().unwrap();
+    init(&root);
+
+    // Setup and status for codex
+    let setup_cdx = run(&root, &["agent", "setup", "codex", "--format=json"]);
+    assert!(setup_cdx.status.success());
+    let val_cdx = validate(&setup_cdx);
+    assert_eq!(val_cdx["data"]["result"]["healthy"], true);
+    assert_eq!(val_cdx["data"]["result"]["provider"], "codex");
+
+    let status_cdx = run(
+        &root,
+        &["agent", "status", "--provider", "codex", "--format=json"],
+    );
+    assert!(status_cdx.status.success());
+    validate(&status_cdx);
+
+    // Setup and status for copilot
+    let setup_cop = run(&root, &["agent", "setup", "copilot", "--format=json"]);
+    assert!(setup_cop.status.success());
+    let val_cop = validate(&setup_cop);
+    assert_eq!(val_cop["data"]["result"]["healthy"], true);
+    assert_eq!(val_cop["data"]["result"]["provider"], "copilot");
+
+    let status_cop = run(
+        &root,
+        &["agent", "status", "--provider", "copilot", "--format=json"],
+    );
+    assert!(status_cop.status.success());
+    validate(&status_cop);
+
+    // Doctor reports both integrations
+    let doctor = run(&root, &["doctor", "--format=json"]);
+    let doc_val: Value = serde_json::from_slice(&doctor.stdout).unwrap();
+    let checks = doc_val["data"]["checks"].as_array().unwrap();
+    assert!(checks.iter().any(|c| c["id"] == "integrations.codex"));
+    assert!(checks.iter().any(|c| c["id"] == "integrations.copilot"));
+
+    // Guard without --allow-degraded-hooks fails
+    let guard_no_flag = run(&root, &["guard", "--provider", "codex", "--", "dummy"]);
+    assert_eq!(guard_no_flag.status.code(), Some(1));
+
+    // Hook callbacks fail closed with provider-specific protocols
+    for (provider, is_copilot) in [("codex", false), ("copilot", true)] {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_sentinel"))
+            .current_dir(root.path())
+            .args(["agent", "hook", "--provider", provider])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child.stdin.take().unwrap().write_all(b"{}").unwrap();
+        let res = child.wait_with_output().unwrap();
+        assert!(res.status.success());
+        let val: Value = serde_json::from_slice(&res.stdout).unwrap();
+        if is_copilot {
+            assert_eq!(val["permissionDecision"], "deny");
+        } else {
+            assert_eq!(val["hookSpecificOutput"]["permissionDecision"], "deny");
+        }
+    }
+}

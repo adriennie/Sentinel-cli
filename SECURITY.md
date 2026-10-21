@@ -1,7 +1,18 @@
-# Security policy
+# Security Policy
 
-Sentinel 0.0.1 is an early local security tool. It does not provide complete security protection or enforce AI-agent permissions. Supported ecosystems, exclusions, audit limitations, and scan failure behavior are described in the documentation.
+Sentinel is a local-first security policy gate, dependency vulnerability scanner, and cryptographic audit engine for AI coding agents and developer workflows.
 
-Report a suspected vulnerability privately through the repository's GitHub security advisory reporting feature when available. If it is unavailable, request a private reporting channel from the maintainer without posting credentials or exploit details in a public issue. Never include real credentials in test fixtures or reports.
+See [docs/threat-model.md](docs/threat-model.md) for details on Sentinel's operational threat model, security invariants, trust boundaries, and scope limits.
 
-No release is considered ready without successful acceptance checks, supported-platform CI, and dependency review. Review the release checksums before running downloaded binaries. Checksums detect accidental changes but are not independent signatures.
+## Reporting Security Vulnerabilities
+
+Please report suspected vulnerabilities privately through GitHub Security Advisory reporting on this repository.
+
+If private vulnerability reporting is unavailable, contact the repository maintainers privately without posting credentials, proof-of-concept exploits, or sensitive details in public issues or pull requests.
+
+## Security Practices
+
+1. **Pre-Action Policy Gate, Not an OS Sandbox**: Sentinel intercepts supported agent actions prior to execution using provider hook protocols and restricted modes. It is not an operating system sandbox (containers/cgroups/hypervisors).
+2. **Deterministic Evaluation**: Sentinel never delegates policy or authorization decisions to an LLM.
+3. **Zero Credential Leaks**: Never commit real API keys, tokens, or credentials to this repository. All test fixtures must use synthetic, dummy identifiers.
+4. **Verified CI & Dependencies**: All release assets must pass automated acceptance suites, 4-target matrix checks, and cryptographic dependency review.
