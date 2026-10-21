@@ -21,11 +21,13 @@ Sentinel was designed as a **local-first, deterministic, pre-action policy gate 
 The goal of v0.0.1 was to establish a high-performance, rock-solid Rust foundation, deterministic policy validation, local scanning engines, and basic audit logging.
 
 ### Architectural Decisions in v0.0.1:
+
 - **Rust Workspace**: Partitioned into `sentinel-cli`, `sentinel-core`, and `sentinel-policy`.
 - **Zero Heavy Runtime Dependencies**: Pure Rust parsers, minimal external crates, offline-capable by default.
 - **Strict Bounded I/O**: File reads capped at 1 MiB; untrusted input never echoed in raw error messages.
 
 ### Completed Checklist (v0.0.1):
+
 - [x] **CLI Framework**: Implemented using Clap 4; subcommands `init`, `policy check`, `scan`, `audit`, `doctor`; global flags (`--project`, `--config`, `--format`, `--quiet`, `--verbose`, `--no-color`).
 - [x] **Project Initialization**: `sentinel init --level L0|L1|L2|L3` with atomic file generation and preservation checks.
 - [x] **Policy Engine (Schema v1)**: Validation of security levels, protected path globs, action kinds, and deterministic precedence ($\text{Deny} \succ \text{RequireApproval} \succ \text{LogOnly} \succ \text{Allow}$).
@@ -42,6 +44,7 @@ The goal of v0.0.1 was to establish a high-performance, rock-solid Rust foundati
 Milestone v0.0.2 introduced pre-action runtime guarding of AI coding agents, cryptographic integrity, static analysis, and multi-provider support.
 
 ### Architectural Decisions in v0.0.2:
+
 - **New Crates**: Added `sentinel-agent`, `sentinel-scanner`, and `sentinel-audit`.
 - **Pre-Action Protocol Bridge**: Integration with Claude Code's native `PreToolUse` hook protocol with `onFailure: "block"` in `--restricted` mode.
 - **Multi-Provider Preview**: Best-effort interceptors for OpenAI Codex and GitHub Copilot CLI requiring `--allow-degraded-hooks`.
@@ -49,6 +52,7 @@ Milestone v0.0.2 introduced pre-action runtime guarding of AI coding agents, cry
 - **Audit Hash Chaining**: Sidecar `audit-chain-v2.jsonl` with domain-separated SHA-256 hashing and external checkpoints.
 
 ### Completed Checklist (v0.0.2):
+
 - [x] **Claude Code Native Gate**: Exec-form `PreToolUse` hook registration in `.claude/settings.json`, restricted launch, self-protection against tampering with `.sentinel` or `sentinel.yml`.
 - [x] **OpenAI Codex & GitHub Copilot Preview**: Multi-provider bridge in `crates/sentinel-agent/src/providers.rs` with cross-platform Windows argument escaping and `--allow-degraded-hooks` enforcement.
 - [x] **Expanded Dependency Ecosystems**: Native parsers for Python `uv.lock`, `poetry.lock`, and pinned `requirements.txt`.
@@ -67,6 +71,7 @@ Milestone v0.0.2 introduced pre-action runtime guarding of AI coding agents, cry
 ## 4. Current Verification & Quality Gates
 
 Every commit and pull request must satisfy the following automated quality gates:
+
 1. `cargo fmt --all -- --check`
 2. `cargo clippy --locked --workspace --all-targets -- -D warnings`
 3. `cargo test --locked --workspace` (122+ native Rust tests passing)
@@ -84,4 +89,3 @@ Every commit and pull request must satisfy the following automated quality gates
 - **v0.0.4**:
   - **Decentralized Multi-Signer Approvals**: Support for team-based M-of-N Ed25519 signatures for high-risk policy escalations.
   - **Continuous In-Memory Taint Tracking**: Tracing tainted strings from agent prompt to tool arguments.
-

@@ -11,11 +11,13 @@ Policy evaluation in `sentinel-policy` maps an incoming action context $(A, \mat
 $$D \in \{\text{Allow}, \text{LogOnly}, \text{RequireApproval}, \text{Deny}\}$$
 
 ### Total Decision Ordering (Rank)
+
 Decisions possess a strict total ordering:
 
 $$\text{Allow}\ (0) \prec \text{LogOnly}\ (1) \prec \text{RequireApproval}\ (2) \prec \text{Deny}\ (3)$$
 
 ### Rule Precedence Resolution
+
 Given a policy with $M$ configured rules $R = \{r_1, r_2, \dots, r_m\}$ and default action $D_{\text{default}}$:
 
 1. Identify matched rules:
@@ -24,6 +26,7 @@ Given a policy with $M$ configured rules $R = \{r_1, r_2, \dots, r_m\}$ and defa
    $$D_{\text{rules}} = \begin{cases} \max_{r \in \mathcal{M}} \text{rank}(r.\text{decision}) & \text{if } \mathcal{M} \neq \emptyset \\ D_{\text{default}} & \text{if } \mathcal{M} = \emptyset \end{cases}$$
 
 ### Security Level Floors ($D_{\text{floor}}$)
+
 Each project defines a security level $L \in \{L0, L1, L2, L3\}$. Let $\mathbb{I}_{\text{protected}} = 1$ if any target path $p \in \mathcal{P}$ matches a glob in `policy.protected_paths`:
 
 $$D_{\text{floor}}(L, A, \mathbb{I}_{\text{protected}}) = \begin{cases}
@@ -207,4 +210,3 @@ flowchart LR
 4. **Link Count and Reparse Point Verification**:
    - **Unix**: Files must satisfy $\text{nlink}() = 1$. Hard links are rejected to prevent multi-path aliasing.
    - **Windows**: Files with attribute bit `0x400` (`FILE_ATTRIBUTE_REPARSE_POINT`) are rejected to prevent NTFS junctions and directory symlink redirection.
-

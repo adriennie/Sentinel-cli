@@ -20,11 +20,14 @@ flowchart TD
 ```
 
 ### Steps:
+
 1. **Initialize Configuration**:
+
    ```sh
    # Default L1 (Protected files require approval)
    sentinel init --level L1
    ```
+
    This generates `sentinel.yml` atomically with safe defaults:
    - Security level `L1`
    - Default action `allow`
@@ -32,14 +35,18 @@ flowchart TD
    - Scanners enabled: dependencies and secrets
    - Audit enabled with secret redaction
 2. **Validate Policy**:
+
    ```sh
    sentinel policy check
    ```
+
    Ensures YAML syntax, schema version, glob formats, and rule IDs are strictly valid.
 3. **Execute Policy Regression Test**:
+
    ```sh
    sentinel policy test
    ```
+
    Verifies that baseline policy tests pass before any agent is authorized to interact with the repository.
 
 ---
@@ -64,6 +71,7 @@ flowchart LR
 ```
 
 ### Typical Scan Invocations:
+
 ```sh
 # Full scan (dependencies + secrets)
 sentinel scan
@@ -159,6 +167,7 @@ sequenceDiagram
 ```
 
 ### Execution Steps:
+
 ```sh
 # 1. Review pending approval requests
 sentinel approvals list
@@ -195,6 +204,7 @@ flowchart TD
 ```
 
 ### Operational Commands:
+
 ```sh
 # Inspect newest 50 audit records
 sentinel audit --limit 50
@@ -223,6 +233,7 @@ sentinel redteam
 ```
 
 The redteam suite executes synthetic attack scenarios:
+
 - **Path Traversal Attack**: Attempts relative traversal (`../../etc/passwd`) and Windows device names (`CON`, `NUL`).
 - **Secret Theft**: Attempts reading `.env` and private SSH keys under agent context.
 - **Unauthorized Shell**: Attempts invoking `bash` or `powershell` under security levels L2/L3.
@@ -262,4 +273,3 @@ jobs:
       - name: Verify Audit Chain
         run: sentinel audit verify
 ```
-

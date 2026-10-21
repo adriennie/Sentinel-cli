@@ -3,6 +3,7 @@
 ## 1. Problem Statement: The AI Coding Assistant Trust Gap
 
 The software development lifecycle has undergone a fundamental transformation from passive code autocomplete to **autonomous AI coding agents** (e.g., Anthropic Claude Code, OpenAI Codex, GitHub Copilot CLI). Developers increasingly grant these agents broad permissions to:
+
 1. Create, edit, and delete arbitrary repository files.
 2. Execute shell commands, test runners, and package managers.
 3. Install third-party packages from public registries.
@@ -41,7 +42,7 @@ flowchart TD
 ## 2. Threat Classification & Mitigations
 
 | Threat | Attack Scenario | Sentinel Mitigation | Milestone |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **Unauthorized File Writes** | Agent modifies production credentials, auth logic (`src/auth/**`), payment code, or Sentinel configuration (`sentinel.yml`). | **Deterministic Policy Engine & Pre-Action Hook**: Protected paths require human approval or are denied outright; self-protection rules unconditionally block writes to Sentinel configs, binary, and git state. | v0.0.1 / v0.0.2 |
 | **Exposed Credentials & Secrets** | Developer accidentally commits API keys; agent reads `.env` and exposes secrets in prompts or tool calls. | **Pattern-Based Secrets Scanner & Strict Output Redaction**: Scans repository text files up to 1 MiB; redacts secret values across stdout, stderr, JSON, SARIF, and audit logs. | v0.0.1 |
 | **Vulnerable Dependencies** | Agent adds or updates a package containing known security vulnerabilities. | **OSV Dependency Scanner with Offline Caching**: Scans `Cargo.lock`, `package-lock.json`, `uv.lock`, `poetry.lock`, and pinned `requirements.txt` against OSV advisories. | v0.0.1 / v0.0.2 |
@@ -75,6 +76,7 @@ Sentinel enforces several non-negotiable security invariants across all subsyste
 ## 4. Protected Assets
 
 Sentinel treats the following repository resources as protected assets:
+
 - **Application Source Code**: Especially designated security-sensitive subsystems (e.g., authentication, payments, data access layers).
 - **Project Configuration & Security Policies**: `sentinel.yml`, GitHub Actions workflows (`.github/workflows/**`), and provider hook settings (`.claude/settings.json`, `.codex/hooks.json`, `.github/hooks/sentinel.json`).
 - **Secrets & Credentials**: `.env` files, private keys (`BEGIN PRIVATE KEY`), cloud tokens (AWS, GitHub PATs, Slack tokens).
@@ -90,14 +92,15 @@ Sentinel treats the following repository resources as protected assets:
 > Sentinel is a pre-action hook firewall that evaluates and gates proposed agent actions *before* execution. **It is not an operating-system sandbox or container.**
 
 ### What Sentinel Guarantees
+
 - Intercepts and validates tool requests delivered through supported pre-action hooks (Claude Code, OpenAI Codex, GitHub Copilot).
 - Evaluates actions deterministically against declared policies and risk signals.
 - Denies known path traversal attempts (`..`), symlinks, hardlinks, Windows reserved devices, and bidi control characters.
 - Detects audit record tampering and log truncation when verified against an external checkpoint.
 
 ### What Lies Outside Sentinel's Boundary
+
 - **Same-User Process Access**: A malicious process running with the same local user privileges can directly manipulate filesystem entries outside Sentinel's hooks.
 - **Upstream Fail-Open Behavior in Best-Effort Providers**: While Claude Code enforces fail-closed blocking (`onFailure: "block"`), Codex and Copilot CLI runners may continue tool execution if a hook times out or crashes. Sentinel requires `--allow-degraded-hooks` to explicitly acknowledge this operational reality.
 - **Already-Running Processes & Unsupervised Shell Sessions**: Commands executed by developers directly in external terminal sessions are not intercepted by agent hooks.
 - **Compromised Host / Administrator Access**: If the host workstation or administrator account is compromised, external OS-level sandboxing (e.g., Docker, Bubblewrap, VMs) is required for containment.
-

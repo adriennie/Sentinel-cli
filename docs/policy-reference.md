@@ -58,7 +58,9 @@ The project security level defines the baseline enforcement floor for all operat
 | **L3** | **Read-Only Lockdown** | **`deny`** | **`deny`** | **`deny`** (all writes, shell, network blocked) |
 
 ### Floor Logic
+
 The security level acts as a non-bypassable floor:
+
 - At **L0**: Writes to protected paths produce `log_only` events in the audit log rather than halting execution.
 - At **L1**: Writes to protected paths require explicit developer approval (`sentinel approvals grant <ID>`).
 - At **L2**: Shell execution (`shell.execute`) and network access (`network.access`) are strictly denied regardless of custom rules.
@@ -136,7 +138,9 @@ sentinel policy test
 ```
 
 ### Policy Test Scenarios
+
 The policy test engine validates:
+
 - Target path normalization (relative paths, escaping attempts).
 - Precedence ordering: $\text{Deny} \succ \text{RequireApproval} \succ \text{LogOnly} \succ \text{Allow}$.
 - Level floor enforcement across L0, L1, L2, and L3.

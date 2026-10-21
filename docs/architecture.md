@@ -25,7 +25,7 @@ Sentinel operates under five core design tenets:
 
 Sentinel is structured as a high-performance, modular Rust workspace:
 
-```
+```bash
 crates/
 ├── sentinel-core/      # Domain primitives, schema versions, result envelopes, SARIF models
 ├── sentinel-policy/    # Policy parsing, L0-L3 levels, glob matching, additive risk scoring
@@ -68,6 +68,7 @@ graph TD
 ## 3. Crate Responsibilities & Boundaries
 
 ### `sentinel-core`
+
 - **Purpose**: Defines shared foundational types, protocol envelopes, and serialization formats.
 - **Components**:
   - `ResultEnvelope<T>` and `ErrorEnvelope`: Standardized JSON envelopes across schema versions 1 and 2.
@@ -76,6 +77,7 @@ graph TD
   - `PathNormalizer`: Cross-platform path validation, lexical traversal elimination, and device-name blocking.
 
 ### `sentinel-policy`
+
 - **Purpose**: Implements deterministic policy evaluation, security levels, and additive risk scoring.
 - **Components**:
   - `Policy`: Deserializer for `sentinel.yml` schema v1 (security levels, protected paths, custom rules).
@@ -84,6 +86,7 @@ graph TD
   - `RuleMatcher`: Glob-pattern matcher against project-relative paths, preventing escape from workspace roots.
 
 ### `sentinel-scanner`
+
 - **Purpose**: Discovers security flaws in code, dependencies, and project artifacts.
 - **Components**:
   - `DependencyParser`: Native lockfile parsers for `Cargo.lock`, `package-lock.json` (v2 and v3), `uv.lock`, `poetry.lock`, pinned `requirements.txt`, and CycloneDX 1.4/1.5 JSON SBOMs.
@@ -93,6 +96,7 @@ graph TD
   - `SecretsScanner`: High-throughput scanner detecting high-entropy secrets, private keys, AWS tokens, GitHub PATs, and credentials with regex heuristics and redaction.
 
 ### `sentinel-audit`
+
 - **Purpose**: Maintains tamper-evident audit logs and decision records.
 - **Components**:
   - `AuditLogger`: Appends structured JSONL events to `.sentinel/audit.jsonl` under cooperative file locks.
@@ -101,6 +105,7 @@ graph TD
   - `CheckpointEngine`: Creates non-overwriting external checkpoint snapshots and verifies chain continuity (`sentinel audit verify`).
 
 ### `sentinel-agent`
+
 - **Purpose**: Provides pre-action interception, runtime guarding, and approval workflows for AI agents.
 - **Components**:
   - `ClaudeHookHandler`: Fail-closed PreToolUse hook server communicating with Anthropic Claude Code via standard JSON protocols.
@@ -109,6 +114,7 @@ graph TD
   - `GuardSession`: Orchestrates agent process lifecycles, injects strict `--restricted` configurations, and strips unapproved MCP tools.
 
 ### `sentinel-cli`
+
 - **Purpose**: Command-line interface and user entrypoint.
 - **Components**:
   - `CliParser`: Clap-based declarative argument parser supporting global flags (`--project`, `--config`, `--format`, `--quiet`, `--verbose`, `--no-color`).
@@ -167,4 +173,3 @@ sequenceDiagram
 | **Audit Log** | Tamper detection, hash chain continuity, truncation detection via checkpoints. | Same-user filesystem access overwriting logs *and* external checkpoints simultaneously. |
 
 Sentinel operates as the **governance and authorization layer** for AI agents. When combined with OS-level virtualization (containers, VMs) and version control (Git), it provides defense-in-depth against autonomous agent manipulation and supply chain risks.
-

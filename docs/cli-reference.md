@@ -42,17 +42,20 @@ Sentinel adheres to a strict, deterministic exit code contract:
 ## 3. Command Reference
 
 ### `sentinel init`
+
 Generates a new `sentinel.yml` policy file in the target project directory.
 
 ```sh
 sentinel init [--level <L0|L1|L2|L3>] [--force]
 ```
+
 - `--level <L0|L1|L2|L3>`: Sets initial baseline security level. (Default: `L1`).
 - `--force`: Replaces an existing `sentinel.yml` file. (Without `--force`, existing files are preserved and an error is returned).
 
 ---
 
 ### `sentinel policy check`
+
 Validates the syntax, schema version, glob rules, and security levels in `sentinel.yml`.
 
 ```sh
@@ -62,6 +65,7 @@ sentinel policy check [--format json]
 ---
 
 ### `sentinel policy test`
+
 Executes automated deterministic test fixtures against the current policy configuration to verify precedence, level floors, and path matching.
 
 ```sh
@@ -71,11 +75,13 @@ sentinel policy test
 ---
 
 ### `sentinel scan`
+
 Runs vulnerability dependency scanning, exploit intelligence enrichment, and secrets scanning.
 
 ```sh
 sentinel scan [OPTIONS]
 ```
+
 - `--type <dependencies|secrets>`: Restricts scan to a single engine. By default, both are executed.
 - `--offline`: Disables OSV API lookups; relies exclusively on `.sentinel/cache/`.
 - `--sbom <PATH>`: Ingests an external CycloneDX 1.4 or 1.5 JSON Software Bill of Materials.
@@ -87,37 +93,44 @@ sentinel scan [OPTIONS]
 ---
 
 ### `sentinel audit`
+
 Queries the append-only JSONL audit event history.
 
 ```sh
 sentinel audit [--limit <N>] [--event <NAME>] [--format json]
 ```
+
 - `--limit <N>`: Maximum number of events to display, newest-first. (Default: 50).
 - `--event <NAME>`: Filters events by event type (e.g., `policy_evaluated`, `scan_completed`).
 
 ---
 
 ### `sentinel audit checkpoint`
+
 Validates the current audit chain and creates a standalone cryptographic checkpoint file.
 
 ```sh
 sentinel audit checkpoint --output <PATH>
 ```
+
 - `--output <PATH>`: Destination path for the checkpoint JSON file (recommended: store outside the project directory).
 
 ---
 
 ### `sentinel audit verify`
+
 Verifies the cryptographic continuity of `.sentinel/audit-chain-v2.jsonl` and validates against an optional checkpoint.
 
 ```sh
 sentinel audit verify [--checkpoint <PATH>] [--format json]
 ```
+
 - `--checkpoint <PATH>`: Validates that the local chain matches or extends the saved checkpoint, detecting truncation attacks.
 
 ---
 
 ### `sentinel doctor`
+
 Performs comprehensive system diagnostics, checking binary compatibility, storage permissions, cache freshness, and lockfile parsing.
 
 ```sh
@@ -127,6 +140,7 @@ sentinel doctor [--format json]
 ---
 
 ### `sentinel agent setup`
+
 Registers Sentinel's pre-action hook into the target AI coding agent configuration.
 
 ```sh
@@ -136,6 +150,7 @@ sentinel agent setup <claude|codex|copilot>
 ---
 
 ### `sentinel agent status`
+
 Inspects the installation status, hook registration, and health of agent integrations.
 
 ```sh
@@ -145,11 +160,13 @@ sentinel agent status [--provider <claude|codex|copilot>]
 ---
 
 ### `sentinel guard`
+
 Launches an AI coding agent inside a guarded environment, enforcing pre-action policy gates.
 
 ```sh
 sentinel guard [OPTIONS] -- <AGENT_COMMAND...>
 ```
+
 - `--scope <GLOB>`: Restricts permitted file writes to the given glob pattern (e.g., `'src/**'`).
 - `--provider <claude|codex|copilot>`: Explicitly identifies the target agent provider (default: `claude`).
 - `--allow-degraded-hooks`: Required when using `codex` or `copilot` to acknowledge the preview / fail-open upstream hook model.
@@ -158,6 +175,7 @@ sentinel guard [OPTIONS] -- <AGENT_COMMAND...>
 ---
 
 ### `sentinel approvals list`
+
 Lists all pending and unexpired approval requests.
 
 ```sh
@@ -167,17 +185,20 @@ sentinel approvals list [--format json]
 ---
 
 ### `sentinel approvals grant`
+
 Authorizes an elevated pre-action request for single-use execution within its 5-minute TTL.
 
 ```sh
 sentinel approvals grant <REQUEST_ID> [--binding <BINDING>]
 ```
+
 - `<REQUEST_ID>`: The identifier of the pending request (e.g., `req_8f1a`).
 - `--binding <BINDING>`: Optional cryptographic binding string from `sentinel approvals list` to verify parameters.
 
 ---
 
 ### `sentinel redteam`
+
 Executes synthetic adversarial test suites against Sentinel's policy engine, path normalizer, and approval system.
 
 ```sh
@@ -191,6 +212,7 @@ sentinel redteam
 Every JSON invocation returns exactly one JSON document on `stdout`. Diagnostic logs are routed to `stderr`.
 
 ### Success Envelope (Schema Version 1)
+
 ```json
 {
   "schema_version": 1,
@@ -205,6 +227,7 @@ Every JSON invocation returns exactly one JSON document on `stdout`. Diagnostic 
 ```
 
 ### Error Envelope
+
 ```json
 {
   "schema_version": 1,
@@ -215,4 +238,3 @@ Every JSON invocation returns exactly one JSON document on `stdout`. Diagnostic 
   }
 }
 ```
-
