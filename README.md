@@ -112,15 +112,15 @@ $$D_{\text{final}} = \max\Big(D_{\text{rules}}, \; D_{\text{floor}}\Big)$$
 An explicit denial always overrides approvals, and risk scores **never** grant permissions.
 
 ### 2. Additive Risk Scoring Model
-$$\text{Score} = \min\Big(10, \; 3 \cdot \mathbb{I}_{\text{protected}} + 4 \cdot \mathbb{I}_{\text{destructive}} + 4 \cdot \mathbb{I}_{\text{secret}} + 2 \cdot \mathbb{I}_{\text{reachable}} + 3 \cdot \mathbb{I}_{\text{kev}} + 2 \cdot \mathbb{I}_{\text{high\_epss}} + 1 \cdot \mathbb{I}_{\text{uncertain}}\Big)$$
+$$\text{Score} = \min\Big(10, \; 3 \cdot \mathbb{I}_{\text{protected}} + 4 \cdot \mathbb{I}_{\text{destructive}} + 4 \cdot \mathbb{I}_{\text{secret}} + 2 \cdot \mathbb{I}_{\text{reachable}} + 3 \cdot \mathbb{I}_{\text{kev}} + 2 \cdot \mathbb{I}_{\text{epss}} + 1 \cdot \mathbb{I}_{\text{uncertain}}\Big)$$
 Scores are saturated in $[0, 10]$ and quantify the risk of an action or vulnerability.
 
 ### 3. Domain-Separated Cryptographic Hash Chaining
-$$H_i = \text{SHA-256}\Big(\text{"sentinel-audit-v2\n"} \parallel \text{str}(i) \parallel \text{"\n"} \parallel H_{i-1} \parallel \text{"\n"} \parallel \text{Canonical}(E_i) \parallel \mathcal{A}_i\Big)$$
+$$H_i = \text{SHA-256}\Big(\text{domain} \parallel \text{seq}_i \parallel H_{i-1} \parallel \text{Canonical}(E_i) \parallel \mathcal{A}_i\Big)$$
 Canonical JSON enforces recursive key sorting and compact formatting. Truncation attacks are detected via independent external checkpoints.
 
 ### 4. Single-Use Cryptographic Approval Tokens
-$$\mathcal{B} = \text{SHA-256}\Big(\text{Canonical}\big(\text{agent}, \text{session}, \text{operation}, \text{targets}, \text{args\_hash}, \text{file\_hashes}, \text{scope}, \text{nonce}, \text{policy}\big)\Big)$$
+$$\mathcal{B} = \text{SHA-256}\Big(\text{Canonical}(\text{agent}, \text{session}, \text{operation}, \text{targets}, h_{\text{args}}, h_{\text{files}}, \text{scope}, \text{nonce}, h_{\text{policy}})\Big)$$
 Tokens expire in 300 seconds (5m TTL) and are consumed atomically under advisory file locks (`flock`).
 
 ### 5. Conservative Static Reachability

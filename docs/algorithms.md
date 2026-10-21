@@ -49,7 +49,7 @@ Sentinel evaluates risk using an additive, bounded evidence vector $\mathbf{e} \
 
 ### Evidence Vector Definition
 
-$$\mathbf{e} = \big(e_{\text{protected}}, \; e_{\text{destructive}}, \; e_{\text{secret}}, \; e_{\text{reachable}}, \; e_{\text{kev}}, \; e_{\text{high\_epss}}, \; e_{\text{uncertain}}\big)$$
+$$\mathbf{e} = \big(e_{\text{protected}}, \; e_{\text{destructive}}, \; e_{\text{secret}}, \; e_{\text{reachable}}, \; e_{\text{kev}}, \; e_{\text{epss}}, \; e_{\text{uncertain}}\big)$$
 
 Where:
 - $e_{\text{protected}} \in \{0, 1\}$: Target path touches a declared protected asset (e.g., auth, billing, workflows).
@@ -57,12 +57,12 @@ Where:
 - $e_{\text{secret}} \in \{0, 1\}$: Target path or payload touches credential stores, `.env`, or exposed tokens.
 - $e_{\text{reachable}} \in \{0, 1\}$: Static dependency analysis proved active import path from entrypoint.
 - $e_{\text{kev}} \in \{0, 1\}$: Associated CVE is cataloged in CISA Known Exploited Vulnerabilities.
-- $e_{\text{high\_epss}} \in \{0, 1\}$: Exploit Prediction Scoring System probability $\ge 0.10$ (90th percentile).
+- $e_{\text{epss}} \in \{0, 1\}$: Exploit Prediction Scoring System probability $\ge 0.10$ (90th percentile).
 - $e_{\text{uncertain}} \in \{0, 1\}$: Analysis scope incomplete, complex AST syntax, or unanalyzed ecosystem.
 
 ### Scoring Formula
 
-$$\text{RiskScore}(\mathbf{e}) = \min\Big(10, \; 3 e_{\text{protected}} + 4 e_{\text{destructive}} + 4 e_{\text{secret}} + 2 e_{\text{reachable}} + 3 e_{\text{kev}} + 2 e_{\text{high\_epss}} + 1 e_{\text{uncertain}}\Big)$$
+$$\text{RiskScore}(\mathbf{e}) = \min\Big(10, \; 3 e_{\text{protected}} + 4 e_{\text{destructive}} + 4 e_{\text{secret}} + 2 e_{\text{reachable}} + 3 e_{\text{kev}} + 2 e_{\text{epss}} + 1 e_{\text{uncertain}}\Big)$$
 
 ### Mathematical Properties:
 1. **Bounded Range**: $\text{RiskScore}(\mathbf{e}) \in [0, 10]$ for all valid inputs.
@@ -131,7 +131,7 @@ reachable (T)    not_analyzed (⊥)
 
 - $\text{reachable}$: An explicit, verified static import path connects an analyzed entrypoint to the target distribution's module namespace.
 - $\text{unknown}$: An entrypoint imports packages dynamically, multiline docstring syntax is detected, entrypoint count exceeds limits, or dependency ecosystem is non-Python.
-- $\text{not_analyzed}$: No entrypoint was supplied, or finding is a secret with no package identity.
+- $\text{not-analyzed}$: No entrypoint was supplied, or finding is a secret with no package identity.
 
 **Soundness Invariant**: Sentinel **never emits `not_reachable`** merely from the absence of static imports. Dynamic `__import__`, `importlib.import_module`, reflection, or conditional branching could invoke dependencies at runtime. Assuming negative reachability would introduce dangerous false negatives.
 
