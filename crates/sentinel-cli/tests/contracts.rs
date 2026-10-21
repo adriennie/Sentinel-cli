@@ -15,6 +15,8 @@ fn out_001_all_commands_and_errors_validate_against_schema() {
         &["policy", "check"],
         &["scan", "--type", "secrets"],
         &["doctor"],
+        &["agent", "status", "--provider", "codex"],
+        &["agent", "status", "--provider", "copilot"],
         &["audit"],
         &["unknown"],
         &["scan", "--type", "invalid"],
@@ -36,6 +38,8 @@ fn out_001_all_commands_and_errors_validate_against_schema() {
             output.status.code(),
             Some(if args[0] == "unknown" || args.contains(&"invalid") {
                 2
+            } else if args.contains(&"status") {
+                1
             } else {
                 0
             })

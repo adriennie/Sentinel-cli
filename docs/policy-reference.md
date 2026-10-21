@@ -1,11 +1,17 @@
-# Version-1 policy reference
+# Sentinel Policy Reference Specification
 
-`sentinel init` generates this structure, with the project name derived from the selected directory:
+This document provides the definitive specification for Sentinel policy configuration (`sentinel.yml`), security levels, rule schemas, glob matching rules, and evaluation semantics.
+
+---
+
+## 1. Schema v1 Specification
+
+Every Sentinel policy file (`sentinel.yml`) must conform to `schema_version: 1`. An initialized policy template generated via `sentinel init --level L1` has the following structure:
 
 ```yaml
 schema_version: 1
 project:
-  name: my-project
+  name: my-backend-service
   level: L1
 policy:
   default_action: allow
@@ -25,16 +31,116 @@ audit:
   redact_secrets: true
 ```
 
-Policy documents must be valid UTF-8 and at most 1 MiB (1,048,576 bytes). Oversized files are rejected using bounded reads, and parser diagnostics report locations without echoing YAML values.
+### Top-Level Fields
 
-All fields are required and unknown fields are rejected at every level. Only schema version 1 and levels L0–L3 are accepted. Project names and rule IDs cannot be blank; rule IDs must be unique. Audit redaction must remain enabled, even while audit storage is deferred.
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `schema_version` | integer | Yes | Must be integer `1`. Future schemas will increment this version. |
+| `project` | object | Yes | Project identity and security level. Unknown keys rejected. |
+| `policy` | object | Yes | Security rules, protected paths, and default action. |
+| `scanning` | object | Yes | Scanner configuration and offline toggles. |
+| `audit` | object | Yes | Audit logging configuration and redaction settings. |
 
-Rules contain `id`, `action`, `paths`, and `decision`. Supported actions are `file.read`, `file.write`, `shell.execute`, and `network.access`. Decisions are `allow`, `log_only`, `require_approval`, and `deny`. File rules require one or more glob paths; shell/network rules require an empty paths list and apply to the whole action. Invalid action/decision names are errors.
+> [!IMPORTANT]
+> Sentinel's policy parser rejects unknown fields at every level (`#[serde(deny_unknown_fields)]`). File size is strictly bounded to 1 MiB (1,048,576 bytes) to prevent resource exhaustion attacks.
 
-Patterns and evaluator target paths use forward slashes and are project-relative. Absolute paths, drive/colon syntax, backslashes, and `..` components are rejected. NUL bytes and empty/root-only targets are also rejected. Leading `./`, internal `.` components, and repeated separators are normalized in both patterns and action targets before matching. Invalid globs are rejected. Matching uses globset semantics: `*` can match path separators and `**` supports recursive patterns. All matching rules participate, including rules matching different targets of a multi-path action. Deny overrides approval, approval overrides log-only, and log-only overrides allow. If no rule matches, `default_action` applies. Overlapping rules are valid.
+---
 
-Level restrictions can strengthen any decision: protected writes are log-only at L0, require approval at L1/L2, and all writes are denied at L3. Shell and network actions are denied at L2/L3. Other actions retain their rule/default decision. The evaluator returns a stable `POLICY_ALLOW`, `POLICY_LOG_ONLY`, `POLICY_REQUIRE_APPROVAL`, or `POLICY_DENY` code, matched rule IDs, and a reason.
+## 2. Security Levels (L0 to L3)
 
-The typed evaluator validates policies before use. Callers must provide nonempty target paths for file actions. It evaluates normalized lexical paths only: it does not resolve symlinks, intercept operations, or provide a filesystem sandbox. Runtime path canonicalization and enforcement belong to future agent adapters.
+The project security level defines the baseline enforcement floor for all operations:
 
-Dependency scanning uses `scanning.dependencies` and `scanning.offline`. Auditing honors `audit.enabled`; `audit.redact_secrets` must remain true. Local secrets scanning honors `scanning.secrets`. Unqualified scans run both enabled scanners. YAML uses serde-saphyr with optional include/interpolation features disabled, duplicate/merge keys rejected, one document, a depth limit of 64, bounded nodes/events and aliases, and sanitized errors. Existing version-1 generated policies remain supported. Stronger security levels likewise describe evaluation decisions, not active workstation permissions.
+| Level | Name | Protected Path Writes | Unprotected File Writes | Shell & Network Execution |
+| :---: | :--- | :--- | :--- | :--- |
+| **L0** | **Permissive / Audit** | `log_only` | `allow` | Rule or Default (`allow`) |
+| **L1** | **Standard Guarded** *(Default)* | `require_approval` | `allow` | Rule or Default (`allow`) |
+| **L2** | **Strict Isolation** | `require_approval` | `allow` (within scope) | **`deny`** (all shell/network blocked) |
+| **L3** | **Read-Only Lockdown** | **`deny`** | **`deny`** | **`deny`** (all writes, shell, network blocked) |
+
+### Floor Logic
+The security level acts as a non-bypassable floor:
+- At **L0**: Writes to protected paths produce `log_only` events in the audit log rather than halting execution.
+- At **L1**: Writes to protected paths require explicit developer approval (`sentinel approvals grant <ID>`).
+- At **L2**: Shell execution (`shell.execute`) and network access (`network.access`) are strictly denied regardless of custom rules.
+- At **L3**: All file write actions (`file.write`), shell execution, and network access are strictly denied.
+
+---
+
+## 3. Custom Rule Syntax
+
+Projects can declare granular custom rules in the `policy.rules` array.
+
+### Rule Structure
+
+```yaml
+policy:
+  rules:
+    - id: block-database-migrations
+      action: file.write
+      paths:
+        - migrations/**
+      decision: deny
+      description: "Automated agent changes to database migrations are strictly forbidden."
+
+    - id: approve-dependency-updates
+      action: file.write
+      paths:
+        - Cargo.toml
+        - Cargo.lock
+        - package.json
+        - package-lock.json
+      decision: require_approval
+      description: "Dependency lockfile changes require human review."
+
+    - id: deny-curl-and-wget
+      action: network.access
+      paths: []
+      decision: deny
+      description: "Block all network access from agent tools."
+```
+
+### Rule Fields
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `id` | string | Unique rule identifier (non-empty, alphanumeric + hyphens/underscores). |
+| `action` | string | One of: `file.read`, `file.write`, `shell.execute`, `network.access`. |
+| `paths` | list[string] | List of project-relative glob patterns. Must be non-empty for `file.*` actions; must be empty (`[]`) for `shell.execute` and `network.access`. |
+| `decision` | string | One of: `allow`, `log_only`, `require_approval`, `deny`. |
+| `description` | string | Optional human-readable documentation explaining the purpose of the rule. |
+
+---
+
+## 4. Path and Glob Semantics
+
+All paths in `protected_paths`, rule `paths`, and incoming agent actions must adhere to strict security constraints:
+
+1. **Project-Relative**: Paths must not start with `/` or drive letters (`C:`).
+2. **No Traversal**: Any path containing `..` as a component is rejected immediately.
+3. **Normalized Separators**: Forward slashes (`/`) must be used. Backslashes (`\`) and colons (`:`) are rejected.
+4. **No NUL Bytes**: Embedded null bytes (`\0`) trigger a validation error.
+5. **Glob Matching**:
+   - `*`: Matches characters within a single directory segment.
+   - `**`: Matches zero or more nested directory segments recursively.
+   - `?`: Matches any single character.
+   - `[a-z]`: Character class matching.
+
+---
+
+## 5. Automated Policy Testing (`sentinel policy test`)
+
+Sentinel supports deterministic policy testing to verify that rules behave as expected before deploying them to production or opening pull requests:
+
+```sh
+sentinel policy test
+```
+
+### Policy Test Scenarios
+The policy test engine validates:
+- Target path normalization (relative paths, escaping attempts).
+- Precedence ordering: $\text{Deny} \succ \text{RequireApproval} \succ \text{LogOnly} \succ \text{Allow}$.
+- Level floor enforcement across L0, L1, L2, and L3.
+- Absence of duplicate rule IDs.
+- Deterministic risk score calculations.
+
+If any test assertion fails, the command exits with **Exit Code 5**, enabling simple integration into CI commit gates.

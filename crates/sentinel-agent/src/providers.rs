@@ -75,7 +75,12 @@ impl AgentAdapter for CopilotAdapter {
             Some("web_fetch" | "web_search") => "WebFetch",
             _ => return Err("Unsupported Copilot tool is denied"),
         };
-        let path = args.get("path").cloned().unwrap_or(Value::Null);
+        let path = args
+            .get("path")
+            .or_else(|| args.get("filePath"))
+            .or_else(|| args.get("file"))
+            .cloned()
+            .unwrap_or(Value::Null);
         translated(
             root,
             input,
@@ -114,6 +119,8 @@ impl AgentAdapter for CodexAdapter {
         let patch = v
             .tool_input
             .get("command")
+            .or_else(|| v.tool_input.get("patch"))
+            .or_else(|| v.tool_input.get("content"))
             .and_then(Value::as_str)
             .ok_or("Missing Codex patch")?;
         let paths = patch_paths(patch)?;
@@ -176,7 +183,8 @@ fn patch_paths(patch: &str) -> Result<Vec<String>> {
                 return Err("Invalid or excessive patch targets");
             };
             paths.push(p.to_owned());
-        } else if !active || !(line.starts_with(['+', '-', ' ', '@']) || *line == "*** End of File")
+        } else if !active
+            || !(line.starts_with(['+', '-', ' ', '@', '\\']) || *line == "*** End of File")
         {
             return Err("Unsupported patch syntax");
         }
@@ -199,19 +207,35 @@ struct State {
 fn state_path(root: &Path, p: Provider) -> Result<PathBuf> {
     Ok(directory(root)?.join(format!("installation-{}.json", p.name())))
 }
+fn hook_directory(root: &Path, parts: &[&str]) -> Result<PathBuf> {
+    let mut current = root.to_path_buf();
+    for part in parts {
+        if !matches!(*part, ".codex" | ".github" | "hooks") {
+            return Err("Invalid provider hook path component");
+        }
+        current.push(part);
+        match fs::create_dir(&current) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            _ => return Err("Unable to create provider hook directory"),
+        }
+        if !fs::symlink_metadata(&current).is_ok_and(|m| m.is_dir()) {
+            return Err("Provider hook directory must not be a symlink");
+        }
+    }
+    Ok(current)
+}
 fn hook_path(root: &Path, p: Provider) -> Result<PathBuf> {
     let parts: &[&str] = match p {
         Provider::Codex => &[".codex"],
         Provider::Copilot => &[".github", "hooks"],
         _ => return Err("Use Claude setup"),
     };
-    Ok(sentinel_audit::storage_directory(root, parts)
-        .map_err(|_| "Unsafe provider hook directory")?
-        .join(if p == Provider::Codex {
-            "hooks.json"
-        } else {
-            "sentinel.json"
-        }))
+    Ok(hook_directory(root, parts)?.join(if p == Provider::Codex {
+        "hooks.json"
+    } else {
+        "sentinel.json"
+    }))
 }
 fn load(root: &Path, p: Provider) -> Result<State> {
     serde_json::from_slice(&read(&state_path(root, p)?, 1024 * 1024)?)
@@ -238,11 +262,19 @@ fn definition(root: &Path, config: &Path, binary: &Path, p: Provider) -> Result<
     if p == Provider::Copilot {
         return Ok(serde_json::json!({"type":"command","exec":binary,"args":args,"timeoutSec":30}));
     }
-    if cfg!(windows) {
-        return Err("Codex command-hook installation currently supports macOS/Linux only");
-    }
     fn quote(s: &str) -> String {
-        format!("'{}'", s.replace('\'', "'\\''"))
+        #[cfg(windows)]
+        {
+            if s.contains(' ') || s.contains('\t') || s.contains('"') || s.is_empty() {
+                format!("\"{}\"", s.replace('"', "\\\""))
+            } else {
+                s.to_string()
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            format!("'{}'", s.replace('\'', "'\\''"))
+        }
     }
     let command = std::iter::once(
         binary
@@ -349,6 +381,9 @@ pub fn status_for(root: &Path, config: &Path, p: Provider) -> Result<Value> {
     let path = hook_path(root, p)?;
     let settings: Value =
         serde_json::from_slice(&read(&path, 1024 * 1024)?).map_err(|_| "Invalid provider hooks")?;
+    if !settings.is_object() || settings.get("disableAllHooks") == Some(&Value::Bool(true)) {
+        return Err("Provider hooks are malformed or disabled");
+    }
     let key = if p == Provider::Codex {
         "PreToolUse"
     } else {
@@ -404,13 +439,15 @@ pub fn guarded_for(
     }
     let _cleanup = Cleanup(root);
     eprintln!("Sentinel: BEST-EFFORT hooks only. Provider errors/timeouts or missing trust can bypass decisions. No strict protection is claimed.");
-    Command::new(exe)
-        .current_dir(root)
+    let mut cmd = Command::new(exe);
+    cmd.current_dir(root)
         .env("SENTINEL_GUARD_PROVIDER", p.name())
         .env("SENTINEL_GUARD_NONCE", session.nonce)
         .env("SENTINEL_GUARD_PROJECT", root)
-        .status()
-        .map_err(|_| "Unable to launch provider")
+        .env_remove("CODEX_DISABLE_HOOKS")
+        .env_remove("COPILOT_DISABLE_HOOKS")
+        .env_remove("GITHUB_COPILOT_DISABLE_HOOKS");
+    cmd.status().map_err(|_| "Unable to launch provider")
 }
 
 /// A validated foreign session lets shared Copilot/Claude discovery abstain only

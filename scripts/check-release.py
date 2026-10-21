@@ -84,6 +84,12 @@ def v002_acceptance(binary, directory):
     assert result.returncode == 4 and secret not in result.stdout + result.stderr
     assert json.loads(result.stdout)["version"] == "2.1.0"
 
+    for provider in ["codex", "copilot"]:
+        res = run([str(binary), "agent", "setup", provider, "--project", str(project), "--format=json"], capture_output=True, text=True)
+        assert json.loads(res.stdout)["data"]["result"]["healthy"] is True
+        res = run([str(binary), "agent", "status", "--provider", provider, "--project", str(project), "--format=json"], capture_output=True, text=True)
+        assert json.loads(res.stdout)["data"]["result"]["healthy"] is True
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)

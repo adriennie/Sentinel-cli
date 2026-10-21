@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: [main]
+    branches: [main, 'integrations/**']
   pull_request:
   workflow_dispatch:
 permissions:
@@ -52,6 +52,8 @@ jobs:
         run: python scripts/check-policy-pr.py --binary target/release/sentinel
       - name: Real Claude client with synthetic localhost API
         run: python scripts/test-claude-provider.py --sentinel target/release/sentinel${{ runner.os == 'Windows' && '.exe' || '' }} --install-client
+      - name: Synthetic Codex and Copilot protocol validation
+        run: python scripts/test-codex-copilot-protocol.py --sentinel target/release/sentinel${{ runner.os == 'Windows' && '.exe' || '' }}
       - name: Verify native target
         shell: python
         run: |
