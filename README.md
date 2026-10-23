@@ -1,4 +1,6 @@
-# Sentinel: Pre-Action Security Firewall for AI Coding Agents
+# Sentinel
+
+### A pre-action security firewall for AI coding agents
 
 [![CI](https://github.com/adriennie/Sentinel-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/adriennie/Sentinel-cli/actions/workflows/ci.yml)
 [![Rust](https://img.shields.io/badge/rust-1.99.1%2B-blue.svg)](Cargo.toml)
@@ -6,296 +8,397 @@
 [![Security Levels](https://img.shields.io/badge/Security%20Levels-L0%20%7C%20L1%20%7C%20L2%20%7C%20L3-orange.svg)](docs/policy-reference.md)
 [![Architecture](https://img.shields.io/badge/Architecture-Local--First%20%7C%20Pre--Action%20Gate-purple.svg)](docs/architecture.md)
 
-Sentinel is a high-performance, local-first security policy gate, dependency vulnerability scanner, and cryptographic audit engine designed to secure AI coding agents (**Anthropic Claude Code**, **OpenAI Codex**, and **GitHub Copilot**) and development workflows.
+[![Watch the 60-second Sentinel demo on YouTube](docs/assets/demo-video.jpg)](https://youtu.be/HKS-hIDk2bo)
 
-Sentinel evaluates agent actions **before execution occurs**, deterministically blocking unauthorized writes, catching exposed credentials and supply-chain vulnerabilities, enforcing human-in-the-loop approvals, and recording tamper-evident audit trails.
+<p align="center"><b><a href="https://youtu.be/HKS-hIDk2bo">▶ Watch the 60-second demo on YouTube</a></b></p>
 
----
+AI coding agents (**Claude Code**, **OpenAI Codex**, **GitHub Copilot CLI**) get full access to your filesystem and shell. Nothing checks what they do *before* they do it.
 
-## The Problem: The AI Coding Agent Trust Gap
-
-Autonomous coding agents are routinely granted broad filesystem and shell privileges to build features and refactor code. This creates a critical dual-threat landscape:
-
-```mermaid
-graph LR
-    subgraph Threats["Dual Threat Landscape"]
-        T1["Autonomous Manipulation<br/>(Prompt Injections, Malicious Issues, Hidden Payloads)"]
-        T2["Supply Chain Compromise<br/>(Vulnerable CVEs, Malicious Packages, Leaked Keys)"]
-    end
-
-    subgraph SentinelEngine["Sentinel Pre-Action Firewall"]
-        P1["Policy & Scope Gate<br/>(L0-L3 Floors, Globs)"]
-        P2["Risk Engine & Scanner<br/>(OSV, KEV, EPSS, Secrets)"]
-        P3["Cryptographic Tokens<br/>(Single-Use, 5m TTL)"]
-    end
-
-    subgraph Execution["Guarded Execution"]
-        E1["Human Approval Gate"]
-        E2["Protected Filesystem & Shell"]
-        E3["Tamper-Evident SHA-256 Audit Log"]
-    end
-
-    Threats --> SentinelEngine
-    SentinelEngine --> Execution
-```
-
-1. **Autonomous Agent Manipulation**: Indirect prompt injections from untrusted repo files, issues, or web lookups can commandeer an agent's control loop, driving it to run destructive shell commands (`rm -rf`, curl-pipe-bash) or overwrite sensitive security configurations.
-2. **Software Supply Chain Risks**: Agents frequently add dependencies without validating vulnerability databases, introducing typo-squatted packages or known CVEs.
-3. **The Sandbox Fallacy**: OS sandboxes (Docker, VMs) isolate processes but lack semantic understanding of agent intent, tool protocols, and fine-grained repository policies. SAST tools run after the fact in CI—long after damage has occurred on the developer's workstation.
-
-Sentinel acts as the **governance and authorization firewall** between the AI agent and your machine.
-
----
-
-## System Architecture
-
-Sentinel is organized as a modular, high-performance Rust workspace:
-
-```mermaid
-graph TD
-    CLI["sentinel-cli<br/>(Command Parser & Output Envelopes)"]
-    AGENT["sentinel-agent<br/>(Agent Firewall, Hooks & Approvals)"]
-    SCANNER["sentinel-scanner<br/>(Vulnerability & Secrets Engines)"]
-    AUDIT["sentinel-audit<br/>(SHA-256 Hash Chains & Checkpoints)"]
-    POLICY["sentinel-policy<br/>(L0-L3 Levels, Globs & Risk Model)"]
-    CORE["sentinel-core<br/>(Types, Envelopes & SARIF)"]
-
-    CLI --> AGENT
-    CLI --> SCANNER
-    CLI --> AUDIT
-    CLI --> POLICY
-    CLI --> CORE
-
-    AGENT --> POLICY
-    AGENT --> AUDIT
-    AGENT --> CORE
-
-    SCANNER --> CORE
-    AUDIT --> CORE
-    POLICY --> CORE
-```
-
-- **[`sentinel-cli`](docs/cli-reference.md)**: Entrypoint CLI, subcommand routing, and standardized JSON/SARIF output envelopes.
-- **[`sentinel-policy`](docs/policy-reference.md)**: Strict schema validation (`sentinel.yml`), path glob matching, and additive risk scoring.
-- **[`sentinel-agent`](docs/agent-firewall.md)**: Runtime pre-action hook gate for Claude Code, preview bridges for Codex/Copilot, and approval token lifecycle.
-- **[`sentinel-scanner`](docs/vulnerability-scanning.md)**: Native lockfile parsers (Cargo, npm, uv, Poetry, requirements.txt, CycloneDX SBOM), OSV client, EPSS/KEV enrichment, Python reachability, and secrets scanning.
-- **[`sentinel-audit`](docs/audit-and-integrity.md)**: Structured JSONL logging, domain-separated SHA-256 hash chaining, and checkpoint verification.
-- **[`sentinel-core`](docs/architecture.md)**: Common primitives, path normalization, and OASIS SARIF v2.1.0 data models.
-
-*For complete architectural details, see the [System Architecture Plan](docs/architecture.md).*
-
----
-
-## Security Levels (L0 to L3)
-
-Sentinel enforces non-bypassable security level floors configured in `sentinel.yml`:
-
-| Level | Mode | Protected Path Writes | Unprotected Writes | Shell & Network Execution |
-| :---: | :--- | :--- | :--- | :--- |
-| **L0** | **Permissive / Audit** | `log_only` | `allow` | Rule or Default (`allow`) |
-| **L1** | **Standard Guarded** *(Default)* | `require_approval` | `allow` | Rule or Default (`allow`) |
-| **L2** | **Strict Isolation** | `require_approval` | `allow` (within scope) | **`deny`** (all shell & network blocked) |
-| **L3** | **Read-Only Lockdown** | **`deny`** | **`deny`** | **`deny`** (all writes, shell, network blocked) |
-
-*For complete policy schema and rule syntax, see the [Policy Reference Specification](docs/policy-reference.md).*
-
----
-
-## Core Algorithms & Cryptographic Specifications
-
-Sentinel relies on provably deterministic mathematical models and cryptographic protocols:
-
-### 1. Deterministic Policy Precedence
-
-```math
-\text{Deny}\ (3) \succ \text{RequireApproval}\ (2) \succ \text{LogOnly}\ (1) \succ \text{Allow}\ (0)
-```
-
-The final decision is the supremum of rule evaluation and security level floors:
-
-```math
-D_{\text{final}} = \max\Big(D_{\text{rules}},\ D_{\text{floor}}\Big)
-```
-
-An explicit denial always overrides approvals, and risk scores **never** grant permissions.
-
-### 2. Additive Risk Scoring Model
-
-```math
-\text{Score} = \min\Big(10,\ 3 \cdot \mathbb{I}_{\text{protected}} + 4 \cdot \mathbb{I}_{\text{destructive}} + 4 \cdot \mathbb{I}_{\text{secret}} + 2 \cdot \mathbb{I}_{\text{reachable}} + 3 \cdot \mathbb{I}_{\text{kev}} + 2 \cdot \mathbb{I}_{\text{epss}} + 1 \cdot \mathbb{I}_{\text{uncertain}}\Big)
-```
-
-Scores are saturated in $[0, 10]$ and quantify the risk of an action or vulnerability.
-
-### 3. Domain-Separated Cryptographic Hash Chaining
-
-```math
-H_i = \text{SHA-256}\Big(\text{domain} \parallel \text{seq}_i \parallel H_{i-1} \parallel \text{Canonical}(E_i) \parallel \mathcal{A}_i\Big)
-```
-
-Canonical JSON enforces recursive key sorting and compact formatting. Truncation attacks are detected via independent external checkpoints.
-
-### 4. Single-Use Cryptographic Approval Tokens
-
-```math
-\mathcal{B} = \text{SHA-256}\Big(\text{Canonical}(\text{agent}, \text{session}, \text{operation}, \text{targets}, h_{\text{args}}, h_{\text{files}}, \text{scope}, \text{nonce}, h_{\text{policy}})\Big)
-```
-
-Tokens expire in 300 seconds (5m TTL) and are consumed atomically under advisory file locks (`flock`).
-
-### 5. Conservative Static Reachability
-
-Models dependencies as a directed import graph over Python entrypoints. Evaluates to `reachable`, `unknown`, or `not_analyzed`. Sentinel **never emits `not_reachable`** from the absence of static evidence alone.
-
-*For complete mathematical proofs and algorithms, see the [Algorithmic & Cryptographic Specifications](docs/algorithms.md).*
-
----
-
-## Supported AI Agent Integrations
-
-| Provider | Integration Status | Interception Mechanism | Hook Failure Mode | Degraded Flag Required? |
-| :--- | :---: | :---: | :---: | :---: |
-| **Anthropic Claude Code** | **Production Native** | Exec `PreToolUse` hook | **Fail-Closed** (`onFailure: block`) | No |
-| **OpenAI Codex** | **Preview / Best-Effort** | Process wrapper bridge | Fail-Open Upstream | **`--allow-degraded-hooks`** |
-| **GitHub Copilot CLI** | **Preview / Best-Effort** | Process wrapper bridge | Fail-Open Upstream | **`--allow-degraded-hooks`** |
-
-> [!WARNING]
-> Claude Code enforces strict fail-closed blocking via native hooks. OpenAI Codex and GitHub Copilot operate under a preview / best-effort model; because upstream runners fail open on errors, Sentinel explicitly requires `--allow-degraded-hooks` to launch them. Sentinel is a pre-action policy gate, not an operating-system sandbox.
-
-*For full integration details, see the [Agent Firewall Guide](docs/agent-firewall.md).*
-
----
-
-## 5-Minute Quickstart
-
-### 1. Installation
-
-Install prebuilt binaries via the one-command installer (macOS & Linux):
+**Sentinel does.** It is a local-first Rust CLI that sits between the agent and your machine. Every file write, shell command and network call is evaluated against your policy **before it runs**, and is then allowed, denied, or held for a human to approve. It also scans dependencies and secrets, and records every decision in a tamper-evident audit log.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/adriennie/sentinel-releases/main/install.sh | bash
 ```
 
-Or install from source with Cargo (requires Rust 1.99.1+):
+---
+
+## Contents
+
+- [Why Sentinel](#why-sentinel)
+- [What it does](#what-it-does)
+- [See it in action](#see-it-in-action)
+- [Quickstart](#quickstart)
+- [How it works](#how-it-works)
+- [Security levels](#security-levels-l0l3)
+- [Agent integrations](#agent-integrations)
+- [Architecture](#architecture)
+- [Core algorithms](#core-algorithms)
+- [Documentation](#documentation)
+- [Development](#development)
+
+---
+
+## Why Sentinel
+
+Coding agents act fast and with your privileges. That creates three problems:
+
+1. **Prompt injection.** A poisoned README, issue or web page can steer the agent into running `rm -rf`, `curl … | bash`, or rewriting your security config.
+2. **Supply-chain risk.** Agents add dependencies without checking them, pulling in known CVEs, typo-squatted packages, or leaked keys.
+3. **The sandbox fallacy.** Containers and VMs isolate processes but don't understand agent intent or repo policy. SAST runs in CI, long after the damage happened on your laptop.
+
+Sentinel is the **authorization layer** between the agent and your machine: deterministic, local, and checked before anything executes.
+
+```mermaid
+graph LR
+    subgraph Threats["Threats"]
+        T1["Agent manipulation<br/>(prompt injection, hidden payloads)"]
+        T2["Supply chain<br/>(CVEs, malicious packages, leaked keys)"]
+    end
+
+    subgraph Sentinel["Sentinel pre-action firewall"]
+        P1["Policy & scope gate<br/>(L0–L3 floors, globs)"]
+        P2["Risk engine & scanner<br/>(OSV, KEV, EPSS, secrets)"]
+        P3["Approval tokens<br/>(single-use, 5m TTL)"]
+    end
+
+    subgraph Execution["Guarded execution"]
+        E1["Human approval"]
+        E2["Protected filesystem & shell"]
+        E3["SHA-256 audit chain"]
+    end
+
+    Threats --> Sentinel --> Execution
+```
+
+---
+
+## What it does
+
+| | |
+| :--- | :--- |
+| 🛡️ **Pre-action gate** | Fail-closed `PreToolUse` hook for Claude Code. If Sentinel errors or times out, the action is blocked. |
+| ⚖️ **Deterministic policy** | L0–L3 security floors, protected-path globs and `--scope` limits. No LLM judges an LLM, so prompt injection can't talk its way past it. |
+| ✋ **Human approvals** | Protected-file edits pause for `sentinel approvals grant`. Tokens are single-use, bound to the exact action, and expire in 5 minutes. |
+| 📦 **Dependency scanning** | Cargo, npm, uv, Poetry, `requirements.txt` and CycloneDX SBOMs against OSV, enriched with CISA KEV and EPSS. Optional Python import reachability. |
+| 🔑 **Secrets scanning** | AWS keys, GitHub tokens, private keys and more, always **redacted** in output. |
+| 🔗 **Tamper-evident audit** | Every decision goes into a domain-separated SHA-256 hash chain, verifiable against external checkpoints. |
+| 📄 **Machine-readable output** | Versioned JSON envelopes and SARIF 2.1.0 for the GitHub Security tab. Stable exit codes 0–8. |
+| ✈️ **Local-first** | No cloud, no telemetry, no dashboard. Policy lives in `sentinel.yml`; scans can run `--offline`. |
+
+---
+
+## See it in action
+
+Real output from `sentinel scan` on a small demo project with two outdated npm packages and an example AWS key:
+
+```console
+$ sentinel init --level L1
+Project policy initialized
+
+$ sentinel scan
+Scan complete: 2 packages checked, 4 files checked, 9 findings
+Medium: npm minimist 1.2.0 — GHSA-vh95-rmgr-6w4m (package-lock.json)
+High: SEC-AWS-001 config.py:2:1 [REDACTED]
+Medium: npm lodash 4.17.15 — GHSA-f23m-r3pf-42rh (package-lock.json)
+Critical: npm minimist 1.2.0 — GHSA-xvch-5gv4-984h (package-lock.json)
+Medium: npm lodash 4.17.15 — GHSA-xxjr-mmjv-4gpg (package-lock.json)
+High: npm lodash 4.17.15 — GHSA-p6mc-m468-83gw (package-lock.json)
+Medium: npm lodash 4.17.15 — GHSA-29mw-wpgm-hmr9 (package-lock.json)
+High: npm lodash 4.17.15 — GHSA-35jh-r3h4-6jhm (package-lock.json)
+High: npm lodash 4.17.15 — GHSA-r5fr-rjxr-66jc (package-lock.json)
+```
+
+The gate fails closed. Malformed or unverifiable hook input is denied, never waved through:
+
+```console
+$ echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"rm -rf /"}}' | sentinel agent hook
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"SENTINEL_FAIL_CLOSED: policy, session, audit, installation, or input verification failed"}}
+```
+
+Providers that can fail open upstream need an explicit opt-in:
+
+```console
+$ sentinel guard --provider codex -- codex
+error: This provider can fail open; explicit --allow-degraded-hooks is required
+```
+
+---
+
+## Quickstart
+
+### 1. Install
+
+Prebuilt binaries for macOS and Linux:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/adriennie/sentinel-releases/main/install.sh | bash
+```
+
+Or build from source (Rust 1.99.1+):
 
 ```sh
 cargo install --locked --path crates/sentinel-cli
 ```
 
-### 2. Initialize Policy
+See [INSTALL.md](INSTALL.md) for more options.
 
-Initialize a repository with standard `L1` security:
+### 2. Create a policy
 
 ```sh
 sentinel init --level L1
 sentinel policy check
 ```
 
-### 3. Scan for Vulnerabilities & Secrets
+This writes `sentinel.yml`:
 
-Run dependencies and secrets scanning:
-
-```sh
-# Full scan (dependencies + secrets)
-sentinel scan
-
-# Dependency-only scan using local offline cache
-sentinel scan --type dependencies --offline
-
-# Export SARIF for GitHub Security tab
-sentinel scan --format sarif > sentinel.sarif
+```yaml
+schema_version: 1
+project:
+  name: my-app
+  level: L1
+policy:
+  default_action: allow
+  protected_paths:
+  - src/auth/**
+  - src/payments/**
+  - .github/workflows/**
+  - .env*
+  - sentinel.yml
+  rules: []
+scanning:
+  dependencies: true
+  secrets: true
+  offline: false
+audit:
+  enabled: true
+  redact_secrets: true
 ```
 
-### 4. Guard an AI Coding Agent Session
-
-Configure and launch Anthropic Claude Code under Sentinel supervision:
+### 3. Scan
 
 ```sh
-# One-time setup: registers fail-closed hook into .claude/settings.json
-sentinel agent setup claude
+sentinel scan                                  # dependencies + secrets
+sentinel scan --type dependencies --offline    # use the local cache only
+sentinel scan --format sarif > sentinel.sarif  # for the GitHub Security tab
+```
 
-# Verify status
+### 4. Guard an agent session
+
+```sh
+sentinel agent setup claude              # registers the fail-closed hook in .claude/settings.json
 sentinel agent status --provider claude
-
-# Launch guarded session restricted to src/
 sentinel guard --scope 'src/**' -- claude
 ```
 
-### 5. Review & Grant Approvals
+### 5. Approve protected actions
 
-When an agent attempts to edit a protected file (e.g. `src/auth/jwt.rs`), Sentinel halts the operation. From a separate terminal:
+When the agent tries to edit a protected file such as `src/auth/jwt.rs`, Sentinel blocks it and opens an approval request. From another terminal:
 
 ```sh
-# Inspect pending requests and risk scores
-sentinel approvals list
-
-# Grant single-use approval (5-minute TTL)
-sentinel approvals grant req_8f1a
+sentinel approvals list            # pending requests with risk scores
+sentinel approvals grant req_8f1a  # single-use, expires in 5 minutes
 ```
 
-The agent retries the action and Sentinel permits execution under lock.
+The agent retries, Sentinel verifies and consumes the token, and the edit goes through.
 
-### 6. Audit & System Health
+### 6. Audit and diagnose
 
 ```sh
-# View newest audit events
 sentinel audit --limit 20
-
-# Create an external tamper-evident checkpoint
 sentinel audit checkpoint --output /var/backups/sentinel-cp.json
-
-# Verify audit hash chain
 sentinel audit verify --checkpoint /var/backups/sentinel-cp.json
-
-# Run system diagnostic checks
 sentinel doctor
+sentinel redteam   # isolated synthetic policy-bypass fixtures
 ```
 
 ---
 
-## Documentation Index
+## How it works
 
-Explore the comprehensive Sentinel documentation suite:
+Sentinel is **a gate, not a sandbox**. It decides before the action runs.
 
-| Document | Description |
-| :--- | :--- |
-| **[System Architecture](docs/architecture.md)** | Crate boundaries, dependency graphs, data flows, and design principles. |
-| **[Algorithmic Specifications](docs/algorithms.md)** | Mathematical models, precedence formulas, hash chaining, reachability lattice, and token binding. |
-| **[Threat Model & Security Invariants](docs/threat-model.md)** | Problem statement, dual threat landscape, security invariants, boundaries, and trust assumptions. |
-| **[Operational Workflow Plan](docs/workflow-plan.md)** | Step-by-step developer onboarding, agent sessions, approval escalations, audit, and CI/CD pipelines. |
-| **[AI Agent Firewall Guide](docs/agent-firewall.md)** | In-depth guide for Claude Code, OpenAI Codex, GitHub Copilot, degraded hooks, and approvals. |
-| **[Policy Reference Specification](docs/policy-reference.md)** | Schema v1 reference for `sentinel.yml`, security levels L0-L3, custom rules, and globs. |
-| **[Vulnerability & Secrets Scanning](docs/vulnerability-scanning.md)** | Lockfile ecosystem support, OSV API, EPSS/KEV enrichment, Python reachability, and secrets. |
-| **[Audit, Integrity & Diagnostics](docs/audit-and-integrity.md)** | JSONL audit store, SHA-256 hash chains, decision journals, external checkpoints, and doctor. |
-| **[CLI Reference Manual](docs/cli-reference.md)** | Complete CLI manual, global flags, exit codes 0-8, and machine-readable JSON envelopes. |
-| **[Roadmap & Evolution](docs/roadmap.md)** | Combined history of v0.0.1 and v0.0.2 milestones, completed checklists, and future v0.0.3 plans. |
-| **[Release Acceptance & Evidence](docs/release-acceptance.md)** | Quality gates, test evidence, packaging, and 4-target verification matrix. |
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as Developer
+    participant Agent as AI coding agent
+    participant Guard as Sentinel hook
+    participant Policy as Policy & risk engine
+    participant Audit as Audit chain
+    participant Approvals as Approval store
+
+    Dev->>Guard: sentinel guard --scope 'src/**' -- claude
+    Guard->>Agent: Launch restricted, with Sentinel hook
+    Agent->>Guard: PreToolUse: Edit src/auth/jwt.rs
+    Guard->>Policy: Evaluate action, path, scope, risk
+    Policy-->>Guard: RequireApproval (risk 7/10)
+    Guard->>Audit: Append decision to hash chain
+    Guard->>Approvals: Create pending request req_8f1a
+    Guard-->>Agent: Deny (approval req_8f1a required)
+
+    Dev->>Approvals: sentinel approvals grant req_8f1a
+    Approvals-->>Dev: Granted (single-use, 5m TTL)
+
+    Agent->>Guard: Retry Edit src/auth/jwt.rs
+    Guard->>Approvals: Verify & consume token
+    Guard->>Audit: Record consumption
+    Guard-->>Agent: Allow
+```
+
+What gets checked:
+
+- **`file.read`**: allowed, except `.env` and Sentinel's own state (`.sentinel/**`).
+- **`file.write`**: governed by the security level. Writes to `sentinel.yml`, `.git`, `.claude` and `.sentinel` are **always denied**.
+- **`shell.execute`** and **`network.access`**: denied at L2 and L3.
+- **Risk score (0–10)**: built from path sensitivity, destructive operations, secrets, CVE reachability, KEV and EPSS. A score can tighten a decision, never loosen it.
 
 ---
 
-## Verification & Testing
+## Security levels (L0–L3)
 
-Sentinel is verified against a 4-target CI matrix (**Linux x64**, **Windows x64**, **macOS Intel**, and **Apple Silicon**):
+Levels are non-bypassable floors set in `sentinel.yml`:
+
+| Level | Mode | Protected writes | Other writes | Shell & network |
+| :---: | :--- | :--- | :--- | :--- |
+| **L0** | Permissive / audit | `log_only` | `allow` | rule or default (`allow`) |
+| **L1** | Standard guarded *(default)* | `require_approval` | `allow` | rule or default (`allow`) |
+| **L2** | Strict isolation | `require_approval` | `allow` (within scope) | **`deny`** |
+| **L3** | Read-only lockdown | **`deny`** | **`deny`** | **`deny`** |
+
+Full schema: [Policy Reference](docs/policy-reference.md).
+
+---
+
+## Agent integrations
+
+| Provider | Status | Mechanism | On hook failure | Needs `--allow-degraded-hooks` |
+| :--- | :---: | :---: | :---: | :---: |
+| **Claude Code** | Production, native | Exec `PreToolUse` hook | **Blocks** (fail-closed) | No |
+| **OpenAI Codex** | Preview | Process wrapper bridge | Fails open upstream | **Yes** |
+| **GitHub Copilot CLI** | Preview | Process wrapper bridge | Fails open upstream | **Yes** |
+
+> [!WARNING]
+> Codex and Copilot runners fail open when an external hook errors, so Sentinel refuses to guard them unless you pass `--allow-degraded-hooks`. Sentinel is a pre-action policy gate, not an operating-system sandbox. Pair it with containers and version control for defense in depth.
+
+Details: [Agent Firewall Guide](docs/agent-firewall.md).
+
+---
+
+## Architecture
+
+A Rust workspace of six crates:
+
+```mermaid
+graph TD
+    CLI["sentinel-cli<br/>(commands, JSON/SARIF, exit codes)"]
+    AGENT["sentinel-agent<br/>(hook gate, guard, approvals)"]
+    SCANNER["sentinel-scanner<br/>(lockfiles, OSV, secrets)"]
+    AUDIT["sentinel-audit<br/>(SHA-256 chain, checkpoints)"]
+    POLICY["sentinel-policy<br/>(L0–L3, globs, risk model)"]
+    CORE["sentinel-core<br/>(types, envelopes, SARIF)"]
+
+    CLI --> AGENT
+    CLI --> SCANNER
+    CLI --> AUDIT
+    CLI --> POLICY
+    CLI --> CORE
+    AGENT --> POLICY
+    AGENT --> AUDIT
+    AGENT --> CORE
+    SCANNER --> CORE
+    AUDIT --> CORE
+    POLICY --> CORE
+```
+
+| Crate | Responsibility |
+| :--- | :--- |
+| [`sentinel-cli`](docs/cli-reference.md) | Entry point, subcommand routing, JSON/SARIF envelopes, exit codes |
+| [`sentinel-policy`](docs/policy-reference.md) | `sentinel.yml` validation, glob matching, decision precedence, risk scoring |
+| [`sentinel-agent`](docs/agent-firewall.md) | Claude Code hook, Codex/Copilot bridges, guarded sessions, approval tokens |
+| [`sentinel-scanner`](docs/vulnerability-scanning.md) | Lockfile parsers, OSV client, EPSS/KEV enrichment, Python reachability, secrets |
+| [`sentinel-audit`](docs/audit-and-integrity.md) | JSONL audit log, hash chaining, decision journal, checkpoints |
+| [`sentinel-core`](docs/architecture.md) | Shared types, path normalization, SARIF 2.1.0 models |
+
+More: [System Architecture](docs/architecture.md).
+
+---
+
+## Core algorithms
+
+### Deterministic precedence
+
+```math
+\text{Deny}\ (3) \succ \text{RequireApproval}\ (2) \succ \text{LogOnly}\ (1) \succ \text{Allow}\ (0)
+```
+
+```math
+D_{\text{final}} = \max\Big(D_{\text{rules}},\ D_{\text{floor}}\Big)
+```
+
+An explicit deny always wins, and risk scores never grant permission.
+
+### Additive risk score
+
+```math
+\text{Score} = \min\Big(10,\ 3 \cdot \mathbb{I}_{\text{protected}} + 4 \cdot \mathbb{I}_{\text{destructive}} + 4 \cdot \mathbb{I}_{\text{secret}} + 2 \cdot \mathbb{I}_{\text{reachable}} + 3 \cdot \mathbb{I}_{\text{kev}} + 2 \cdot \mathbb{I}_{\text{epss}} + 1 \cdot \mathbb{I}_{\text{uncertain}}\Big)
+```
+
+### Hash-chained audit log
+
+```math
+H_i = \text{SHA-256}\Big(\text{domain} \parallel \text{seq}_i \parallel H_{i-1} \parallel \text{Canonical}(E_i) \parallel \mathcal{A}_i\Big)
+```
+
+Canonical JSON (sorted keys, compact form) keeps hashes stable. External checkpoints detect truncation.
+
+### Single-use approval tokens
+
+```math
+\mathcal{B} = \text{SHA-256}\Big(\text{Canonical}(\text{agent}, \text{session}, \text{operation}, \text{targets}, h_{\text{args}}, h_{\text{files}}, \text{scope}, \text{nonce}, h_{\text{policy}})\Big)
+```
+
+Tokens expire after 300 seconds and are consumed atomically under an advisory file lock (`flock`).
+
+### Conservative reachability
+
+Python dependencies are modeled as an import graph from entry points, yielding `reachable`, `unknown` or `not_analyzed`. Sentinel **never reports `not_reachable`** just because static evidence is missing.
+
+Proofs and details: [Algorithmic Specifications](docs/algorithms.md).
+
+---
+
+## Documentation
+
+| Document | What's inside |
+| :--- | :--- |
+| [System Architecture](docs/architecture.md) | Crate boundaries, data flow, design principles |
+| [Algorithmic Specifications](docs/algorithms.md) | Precedence, risk model, hash chaining, token binding, reachability |
+| [Threat Model](docs/threat-model.md) | Threats, security invariants, trust boundaries |
+| [Workflow Plan](docs/workflow-plan.md) | Onboarding, agent sessions, approvals, CI/CD |
+| [Agent Firewall Guide](docs/agent-firewall.md) | Claude Code, Codex, Copilot, degraded hooks, approvals |
+| [Policy Reference](docs/policy-reference.md) | `sentinel.yml` schema, levels, rules, globs |
+| [Vulnerability & Secrets Scanning](docs/vulnerability-scanning.md) | Ecosystems, OSV, EPSS/KEV, reachability, secrets |
+| [Audit & Integrity](docs/audit-and-integrity.md) | Audit store, hash chains, checkpoints, `doctor` |
+| [CLI Reference](docs/cli-reference.md) | Every command, global flags, exit codes 0–8, JSON envelopes |
+| [Roadmap](docs/roadmap.md) | v0.0.1 and v0.0.2 history, v0.0.3 plans |
+| [Release Acceptance](docs/release-acceptance.md) | Quality gates, test evidence, 4-target matrix |
+
+---
+
+## Development
+
+CI runs on Linux x64, Windows x64, macOS Intel and Apple Silicon.
 
 ```sh
-# Code formatting
 cargo fmt --all -- --check
-
-# Strict Clippy validation
 cargo clippy --locked --workspace --all-targets -- -D warnings
-
-# Run all 122+ workspace tests
-cargo test --locked --workspace
-
-# Run synthetic Codex / Copilot protocol tests
-python3 scripts/test-codex-copilot-protocol.py
-
-# Run end-to-end release acceptance
-python3 scripts/check-release.py
+cargo test --locked --workspace                  # 122+ tests
+python3 scripts/test-codex-copilot-protocol.py   # synthetic Codex / Copilot protocol tests
+python3 scripts/check-release.py                 # end-to-end release acceptance
 ```
 
----
+Found a vulnerability? See [SECURITY.md](SECURITY.md). Release notes: [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-Sentinel is licensed under the [MIT License](LICENSE).
+[MIT](LICENSE)
